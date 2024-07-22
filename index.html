@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Orrery</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: black;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+        }
+        #orrery {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .planet {
+            position: absolute;
+            border: 1px solid white;
+            border-radius: 50%;
+            transform-origin: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="orrery"></div>
+
+    <script>
+        const planets = [
+            { name: "Mercury", distance: 0.4, radius: 0.38 },
+            { name: "Venus", distance: 0.7, radius: 0.95 },
+            { name: "Earth", distance: 1.0, radius: 1.0 },
+            { name: "Mars", distance: 1.5, radius: 0.53 },
+            { name: "Jupiter", distance: 5.2, radius: 11.2 },
+            { name: "Saturn", distance: 9.5, radius: 9.45 },
+            { name: "Uranus", distance: 19.8, radius: 4.0 },
+            { name: "Neptune", distance: 30.1, radius: 3.88 }
+        ];
+
+        const orrery = document.getElementById('orrery');
+        const orrerySize = Math.min(window.innerWidth, window.innerHeight);
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        const maxDistance = planets[planets.length - 1].distance;
+
+        const scale = (orrerySize / 2) / (maxDistance + 1); // Scale to fit the entire system within the window
+
+        planets.forEach(planet => {
+            const planetElement = document.createElement('div');
+            planetElement.className = 'planet';
+            const distance = planet.distance * scale;
+            const radius = planet.radius * scale * 5; // Scaled for better visibility
+
+            planetElement.style.width = `${radius}px`;
+            planetElement.style.height = `${radius}px`;
+            planetElement.style.left = `${centerX + distance - radius / 2}px`;
+            planetElement.style.top = `${centerY - radius / 2}px`;
+
+            orrery.appendChild(planetElement);
+        });
+
+        window.addEventListener('resize', () => {
+            window.location.reload();
+        });
+    </script>
+</body>
+</html>
