@@ -56,6 +56,9 @@ body, html {
     background-color: transparent;
     font-size: 18px;
     font-family: 'Roboto Thin', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .nav-button:hover {
