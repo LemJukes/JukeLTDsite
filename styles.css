@@ -1,0 +1,22 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: black;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+}
+#orrery {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.planet {
+    position: absolute;
+    border: 1px solid white;
+    border-radius: 50%;
+}
