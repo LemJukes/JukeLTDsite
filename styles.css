@@ -43,7 +43,7 @@ body, html {
     left: 10px;
     display: flex;
     gap: 10px;
-    transform: scale(0.75); /* Scaled down to 75% */
+    transform: scale(0.85); /* Scaled down to 75% */
     transform-origin: bottom left; /* Ensures scaling is from bottom left corner */
 }
 
