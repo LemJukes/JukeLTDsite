@@ -93,6 +93,10 @@ body, html {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
+.nav-section {
+    position: relative;
+}
+
 /* Mobile styles */
 @media (max-width: 768px) {
     .header {
@@ -115,3 +119,4 @@ body, html {
         padding: 8px 16px;
     }
 }
+
