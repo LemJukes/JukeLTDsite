@@ -10,7 +10,7 @@
     <div id="orrery"></div>
     <div class="content">
         <h1 class="header header-alone">< SW: EotE - Dice Result Generator ></h1>
-        <p>Click the symbols to add results:</p>
+        <p class="swdr-instructions">Click the symbols to add results:</p>
         <div class="button-grid" id="buttonGrid">
             <!-- Buttons will be added here by JavaScript -->
         </div>
@@ -18,7 +18,7 @@
             <span id="resultText"></span>
         </div>
         <div class="controls">
-            <button onclick="copyToClipboard()">Copy to Clipboard</button>
+            <button id="copyButton">Copy to Clipboard</button>
             <button onclick="clearResult()">Clear</button>
         </div>
         <div class="tooltip" id="tooltip"></div>

@@ -167,6 +167,11 @@ body, html {
     background: rgba(255, 255, 255, 0.1);
 }
 
+.controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 .tooltip {
     position: absolute;
     bottom: 0;
@@ -180,6 +185,10 @@ body, html {
     color: white;
     display: none;
     z-index: 2;
+}
+
+.swdr-instructions {
+    text-align: center;
 }
 
 /* Mobile styles */
@@ -204,4 +213,3 @@ body, html {
         padding: 8px 16px;
     }
 }
-
