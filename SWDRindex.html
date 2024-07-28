@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Wars Dice Roll Generator</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Use the main website's stylesheet -->
+</head>
+<body>
+    <div id="orrery"></div>
+    <div class="content">
+        <h1 class="header header-alone">< SW: EotE - Dice Result Generator ></h1>
+        <p>Click the symbols to add results:</p>
+        <div class="button-grid" id="buttonGrid">
+            <!-- Buttons will be added here by JavaScript -->
+        </div>
+        <div class="result">
+            <span id="resultText"></span>
+        </div>
+        <div class="controls">
+            <button onclick="copyToClipboard()">Copy to Clipboard</button>
+            <button onclick="clearResult()">Clear</button>
+        </div>
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+    <a href="silly_projects.html" class="back-button">Back</a>
+    <script src="script.js"></script> <!-- Include the main website's script -->
+    <script src="SWDRscripts.js"></script> <!-- Include the SWDR specific script -->
+</body>
+</html>
