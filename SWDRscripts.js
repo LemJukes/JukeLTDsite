@@ -7,9 +7,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const symbols = [
         { symbol: '✅', label: 'Success' },
         { symbol: '➕', label: 'Advantage' },
+        { symbol: '✨', label: 'Triumph' },
         { symbol: '❌', label: 'Failure' },
         { symbol: '⚠️', label: 'Threat' },
-        { symbol: '✨', label: 'Triumph' },
         { symbol: '💀', label: 'Despair' },
     ];
 
