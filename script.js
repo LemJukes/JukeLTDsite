@@ -1,3 +1,4 @@
+// Background Orrery Effect Scripts
 const planets = [
     { name: "Mercury", distance: 0.4, radius: 0.38, period: 88, eccentricity: 0.205 },
     { name: "Venus", distance: 0.7, radius: 0.95, period: 225, eccentricity: 0.007 },
@@ -52,4 +53,42 @@ requestAnimationFrame(updatePositions);
 
 window.addEventListener('resize', () => {
     window.location.reload();
+});
+
+// About Me page script
+document.addEventListener("DOMContentLoaded", function() {
+    fetch('aboutme.txt')
+        .then(response => response.text())
+        .then(text => {
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+
+            // Create a weighted array where the probability decreases as the index increases
+            const weights = lines.map((_, index) => lines.length - index);
+            const totalWeight = weights.reduce((acc, weight) => acc + weight, 0);
+
+            // Generate a random number between 0 and totalWeight
+            const randomNum = Math.random() * totalWeight;
+
+            // Find the line based on the weighted random number
+            let cumulativeWeight = 0;
+            let selectedLine = lines[0];
+            let selectedProbability = 0;
+            for (let i = 0; i < lines.length; i++) {
+                cumulativeWeight += weights[i];
+                if (randomNum < cumulativeWeight) {
+                    selectedLine = lines[i];
+                    selectedProbability = (weights[i] / totalWeight) * 100;
+                    break;
+                }
+            }
+
+            // Log the probability of the selected line
+            console.log(`Line: "${selectedLine}" has a probability of ${selectedProbability.toFixed(2)}%`);
+
+            const aboutTextElement = document.getElementById("aboutText");
+            if (aboutTextElement) {
+                aboutTextElement.textContent = selectedLine;
+            }
+        })
+        .catch(error => console.error('Error fetching aboutme.txt:', error));
 });
