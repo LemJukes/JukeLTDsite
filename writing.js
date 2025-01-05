@@ -1,14 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     const writingFiles = [
         'gravity-baby.txt',
-        'gravity-story-expansion.txt'
         // Add more files as they're created
     ];
 
     const buttonContainer = document.getElementById('writing-buttons');
     const textContent = document.getElementById('text-content');
 
-    // Create buttons for each writing file
     writingFiles.forEach(file => {
         const button = document.createElement('a');
         button.className = 'nav-button';
