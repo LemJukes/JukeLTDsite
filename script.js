@@ -33,8 +33,8 @@ function updatePositions(time) {
     planets.forEach(planet => {
         const planetElement = document.getElementById(planet.name);
         const distance = planet.distance * scale;
-        const angle = (time / planet.period) * 2 * Math.PI * 0.25; // 10x real time
-
+        const angle = (time / planet.period) * 2 * Math.PI * 0.125;
+        
         // Apply elliptical orbit using the eccentricity
         const eccentricity = planet.eccentricity;
         const a = distance; // Semi-major axis
