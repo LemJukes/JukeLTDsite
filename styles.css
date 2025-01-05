@@ -213,3 +213,47 @@ body, html {
         padding: 8px 16px;
     }
 }
+
+.writing-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    margin-top: 20px;
+    z-index: 2;
+}
+
+.text-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 80%;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid white;
+    padding: 20px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    display: none;
+    z-index: 3;
+}
+
+.text-content.visible {
+    display: block;
+}
+
+.close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    border: 1px solid white;
+    padding: 5px 10px;
+    background: transparent;
+    color: white;
+}
+
+.hidden {
+    display: none;
+}
