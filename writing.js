@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const writingFiles = [
-        'gravity-baby.txt'
+        'gravity-baby.txt',
+        'gravity-story-expansion.txt'
         // Add more files as they're created
     ];
 
