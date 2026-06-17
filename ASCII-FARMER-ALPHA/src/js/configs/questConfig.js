@@ -1,0 +1,612 @@
+const questDefinitions = [
+    {
+        id: 'produce-for-gigagrocery',
+        name: 'GigaGrocery Onboarding Shipment',
+        issuer: 'GigaGrocery Procurement Grid',
+        flavorText: `farmr says GigaGrocery wants a clean first shipment before opening a recurring contract lane with you. Finish this run to learn how deliveries work and why quest payouts are worth chasing.`,
+        requirements: {
+            wheat: 10,
+            corn: 0,
+            tomato: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requirements: {
+                wheat: 10,
+                corn: 0,
+                tomato: 0,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: 'Quest deliveries pay 2x store sale price for delivered crops',
+        },
+    },
+    {
+        id: 'gigagrocery-priority-restock-window',
+        name: 'GigaGrocery Priority Restock Window',
+        issuer: 'GigaGrocery Procurement Grid',
+        flavorText: `farmr says the grid elevated your account to priority intake. This restock is larger and timed, so dispatch has to arrive before the lane closes to avoid a late intake deduction.`,
+        requirements: {
+            wheat: 20,
+            corn: 0,
+            tomato: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'produce-for-gigagrocery',
+            requirements: {
+                wheat: 22,
+                corn: 0,
+                tomato: 0,
+            },
+        },
+        deliveryWindowMs: 120000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'gigagrocery-bulk-lane-escalation',
+        name: 'GigaGrocery Bulk Lane Escalation',
+        issuer: 'GigaGrocery Procurement Grid',
+        flavorText: `farmr says this is the next step up from your starter contracts: a larger wheat-only intake run with a tighter dispatch target.` ,
+        requirements: {
+            wheat: 30,
+            corn: 0,
+            tomato: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'gigagrocery-priority-restock-window',
+            requirements: {
+                wheat: 38,
+                corn: 0,
+                tomato: 0,
+            },
+        },
+        deliveryWindowMs: 150000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'root-66-corn-onboarding',
+        name: 'Root 66 Corn Onboarding Ticket',
+        issuer: 'Root 66 Diner',
+        flavorText: `farmr says corn finally hit your route and Root 66 wants a clean single-crop test run before they increase order complexity.`,
+        requirements: {
+            wheat: 0,
+            corn: 10,
+            tomato: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'gigagrocery-bulk-lane-escalation',
+            requirements: {
+                wheat: 38,
+                corn: 10,
+                tomato: 0,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'root-66-corn-rush-window',
+        name: 'Root 66 Corn Rush Window',
+        issuer: 'Root 66 Diner',
+        flavorText: `farmr says Root 66 doubled its corn prep line and needs a faster follow-up run. Late arrivals are accepted but reduced for queue disruption.`,
+        requirements: {
+            wheat: 0,
+            corn: 20,
+            tomato: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'root-66-corn-onboarding',
+            requirements: {
+                wheat: 38,
+                corn: 24,
+                tomato: 0,
+            },
+        },
+        deliveryWindowMs: 120000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'root-66-corn-freight-escalation',
+        name: 'Root 66 Corn Freight Escalation',
+        issuer: 'Root 66 Diner',
+        flavorText: `farmr says Root 66 is comfortable with your corn reliability and is sending a larger contract stage to match diner expansion.`,
+        requirements: {
+            wheat: 0,
+            corn: 30,
+            tomato: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'root-66-corn-rush-window',
+            requirements: {
+                wheat: 38,
+                corn: 42,
+                tomato: 0,
+            },
+        },
+        deliveryWindowMs: 150000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'open-source-tomato-onboarding',
+        name: 'Open Source Organics Tomato Onboarding',
+        issuer: 'Open Source Organics',
+        flavorText: `farmr says tomato lanes are live now, and the co-op wants a focused onboarding delivery before blending you into mixed neighborhood contracts.`,
+        requirements: {
+            wheat: 0,
+            corn: 0,
+            tomato: 10,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'root-66-corn-freight-escalation',
+            requirements: {
+                wheat: 38,
+                corn: 42,
+                tomato: 10,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'open-source-tomato-rush-window',
+        name: 'Open Source Organics Tomato Rush Window',
+        issuer: 'Open Source Organics',
+        flavorText: `farmr says tomato demand jumped and the co-op needs a larger follow-up under a service window. Late intake is still accepted with a reduced payout.`,
+        requirements: {
+            wheat: 0,
+            corn: 0,
+            tomato: 20,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'open-source-tomato-onboarding',
+            requirements: {
+                wheat: 38,
+                corn: 42,
+                tomato: 24,
+            },
+        },
+        deliveryWindowMs: 120000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'gigagrocery-balanced-refresh',
+        name: 'GigaGrocery Root Cellar Pilot',
+        issuer: 'GigaGrocery Procurement Grid',
+        flavorText: `farmr says GigaGrocery added potato bins to your route and wants your first mixed cellar shipment to prove you can juggle a fourth crop without the training wheels.`,
+        requirements: {
+            wheat: 18,
+            corn: 10,
+            tomato: 8,
+            potato: 12,
+            carrot: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'open-source-tomato-rush-window',
+            requirements: {
+                wheat: 50,
+                corn: 42,
+                tomato: 26,
+                potato: 6,
+                carrot: 0,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'root-66-skillet-supply',
+        name: 'Root 66 Potato Freight Surge',
+        issuer: 'Root 66 Diner',
+        flavorText: `farmr says Root 66 skipped the gentle intro and needs a potato-forward skillet dispatch right away. This lane stays mixed and closes on a live intake timer.`,
+        requirements: {
+            wheat: 10,
+            corn: 18,
+            tomato: 8,
+            potato: 24,
+            carrot: 0,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'gigagrocery-balanced-refresh',
+            requirements: {
+                wheat: 58,
+                corn: 50,
+                tomato: 32,
+                potato: 20,
+                carrot: 0,
+            },
+        },
+        deliveryWindowMs: 150000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'open-source-greenbox-round',
+        name: 'Open Source Carrot Grid Debut',
+        issuer: 'Open Source Organics',
+        flavorText: `farmr says carrot bundles are joining the co-op boxes now, and this debut contract throws them straight into a neighborhood mix instead of another beginner-only tutorial.`,
+        requirements: {
+            wheat: 4,
+            corn: 4,
+            tomato: 6,
+            potato: 4,
+            carrot: 30,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'root-66-skillet-supply',
+            requirements: {
+                wheat: 66,
+                corn: 60,
+                tomato: 46,
+                potato: 36,
+                carrot: 20,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'git-grocer-branch-stock',
+        name: 'Git Grocer Carrot Color Burst',
+        issuer: 'Git Grocer',
+        flavorText: `farmr says Git Grocer wants a brighter carrot-weighted aisle reset layered over the tomato and potato lanes you already know how to run.`,
+        requirements: {
+            wheat: 12,
+            corn: 14,
+            tomato: 18,
+            potato: 12,
+            carrot: 30,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'open-source-greenbox-round',
+            requirements: {
+                wheat: 72,
+                corn: 66,
+                tomato: 50,
+                potato: 42,
+                carrot: 22,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'cache-harvest-breakfast-line',
+        name: 'Cache & Harvest Five-Lane Breakfast',
+        issuer: 'Cache & Harvest Hotel',
+        flavorText: `farmr says the breakfast line now expects a true five-crop spread, with each lane contributing enough volume to cover guest turnover.`,
+        requirements: {
+            wheat: 20,
+            corn: 16,
+            tomato: 14,
+            potato: 12,
+            carrot: 10,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'git-grocer-branch-stock',
+            requirements: {
+                wheat: 84,
+                corn: 78,
+                tomato: 62,
+                potato: 54,
+                carrot: 34,
+            },
+        },
+        deliveryWindowMs: 180000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'gigagrocery-lunchwave-grid',
+        name: 'GigaGrocery Pantry Sync',
+        issuer: 'GigaGrocery Procurement Grid',
+        flavorText: `farmr says the lunchwave forecast now mixes tomato prep with potato shelf stock and carrot garnish packs, so every lane has to stay in step.`,
+        requirements: {
+            wheat: 18,
+            corn: 18,
+            tomato: 20,
+            potato: 16,
+            carrot: 12,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'cache-harvest-breakfast-line',
+            requirements: {
+                wheat: 96,
+                corn: 90,
+                tomato: 76,
+                potato: 66,
+                carrot: 46,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'root-66-evening-ticket',
+        name: 'Root 66 Evening Ticket',
+        issuer: 'Root 66 Diner',
+        flavorText: `farmr says evening service now runs on a full five-crop prep board, with wheat still leading but root vegetables taking up more of the line.`,
+        requirements: {
+            wheat: 8,
+            corn: 8,
+            tomato: 34,
+            potato: 6,
+            carrot: 6,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'gigagrocery-lunchwave-grid',
+            requirements: {
+                wheat: 112,
+                corn: 108,
+                tomato: 100,
+                potato: 84,
+                carrot: 64,
+            },
+        },
+        deliveryWindowMs: 180000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'open-source-shared-table',
+        name: 'Open Source Shared Table',
+        issuer: 'Open Source Organics',
+        flavorText: `farmr says this shared-table run leans on corn, but the co-op still wants tomato, potato, and carrot coverage in every crate.`,
+        requirements: {
+            wheat: 16,
+            corn: 24,
+            tomato: 20,
+            potato: 18,
+            carrot: 16,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'root-66-evening-ticket',
+            requirements: {
+                wheat: 120,
+                corn: 116,
+                tomato: 100,
+                potato: 94,
+                carrot: 74,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'git-grocer-aisle-reset',
+        name: 'Git Grocer Aisle Reset',
+        issuer: 'Git Grocer',
+        flavorText: `farmr says this aisle reset still favors tomato density, but the branch managers now expect potato and carrot support on every display.`,
+        requirements: {
+            wheat: 18,
+            corn: 18,
+            tomato: 24,
+            potato: 20,
+            carrot: 18,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'open-source-shared-table',
+            requirements: {
+                wheat: 132,
+                corn: 128,
+                tomato: 116,
+                potato: 108,
+                carrot: 88,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'cache-harvest-banquet-prep',
+        name: 'Cache & Harvest Banquet Prep',
+        issuer: 'Cache & Harvest Hotel',
+        flavorText: `farmr says banquet prep needs a wheat-led core, but the room-service planners now rely on potatoes and carrots to round out the menu mix.`,
+        requirements: {
+            wheat: 28,
+            corn: 22,
+            tomato: 20,
+            potato: 18,
+            carrot: 18,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'git-grocer-aisle-reset',
+            requirements: {
+                wheat: 148,
+                corn: 140,
+                tomato: 128,
+                potato: 122,
+                carrot: 102,
+            },
+        },
+        deliveryWindowMs: 210000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'gigagrocery-city-pilot',
+        name: 'GigaGrocery City Pilot',
+        issuer: 'GigaGrocery Procurement Grid',
+        flavorText: `farmr says city pilot nodes are corn-heavy this cycle and want all five crop lanes moving at consistent throughput.`,
+        requirements: {
+            wheat: 18,
+            corn: 28,
+            tomato: 22,
+            potato: 20,
+            carrot: 20,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'cache-harvest-banquet-prep',
+            requirements: {
+                wheat: 160,
+                corn: 156,
+                tomato: 142,
+                potato: 136,
+                carrot: 116,
+            },
+        },
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'root-66-double-shift',
+        name: 'Root 66 Double Shift',
+        issuer: 'Root 66 Diner',
+        flavorText: `farmr says double-shift kitchens are still tomato-biased, but potato and carrot sides now share equal priority with the older lanes.`,
+        requirements: {
+            wheat: 18,
+            corn: 20,
+            tomato: 28,
+            potato: 22,
+            carrot: 22,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'gigagrocery-city-pilot',
+            requirements: {
+                wheat: 174,
+                corn: 170,
+                tomato: 156,
+                potato: 150,
+                carrot: 130,
+            },
+        },
+        deliveryWindowMs: 210000,
+        lateFeeMinPercent: 5,
+        lateFeeMaxPercent: 10,
+        reward: {
+            type: 'doubleSalePrice',
+            description: '2x store sale price for each crop delivered',
+        },
+    },
+    {
+        id: 'net-space-uplink-clearance',
+        name: 'Net-Space Uplink Clearance',
+        issuer: 'farmr',
+        flavorText: `farmr says your node's output has been flagged for net-space uplink eligibility. Complete this clearance dispatch — five full lanes, no gaps — and farmr will authorize your grid access.`,
+        requirements: {
+            wheat: 25,
+            corn: 25,
+            tomato: 25,
+            potato: 25,
+            carrot: 25,
+        },
+        unlockCondition: {
+            type: 'cropsSold',
+            requiresQuestCompleted: 'root-66-double-shift',
+            requirements: {
+                wheat: 274,
+                corn: 274,
+                tomato: 252,
+                potato: 252,
+                carrot: 230,
+            },
+        },
+        deliveryWindowMs: 300000,
+        lateFeeMinPercent: 10,
+        lateFeeMaxPercent: 20,
+        reward: {
+            type: 'featureUnlock',
+            feature: 'netSpace',
+            description: 'Net-Space access unlocked',
+        },
+    },
+];
+
+function getQuestDefinitions() {
+    return questDefinitions.map((quest, index) => ({
+        ...quest,
+        questNumber: index + 1,
+        requirements: { ...quest.requirements },
+        unlockCondition: quest.unlockCondition
+            ? {
+                ...quest.unlockCondition,
+                requirements: { ...(quest.unlockCondition.requirements || {}) },
+            }
+            : null,
+        reward: quest.reward ? { ...quest.reward } : null,
+    }));
+}
+
+function getQuestDefinitionById(questId) {
+    return getQuestDefinitions().find((quest) => quest.id === questId) || null;
+}
+
+export { getQuestDefinitions, getQuestDefinitionById };

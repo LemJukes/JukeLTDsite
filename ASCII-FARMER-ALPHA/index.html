@@ -1,0 +1,168 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII FARMER</title>
+    <link rel="stylesheet" href="./src/css/styles.css">
+    <link rel="icon" href="./src/assets/jukeLTDFavicon.png" type="image/x-icon">
+</head>
+<body>
+    <div class="app-shell">
+        <section class="boot-sequence" id="boot-sequence" aria-label="Startup Sequence">
+            <div class="boot-title-panel" id="boot-title-panel" aria-hidden="true">
+                <pre>
+             _____  _____ _____ _____   
+      /\    / ____|/ ____|_   _|_   _| 
+     /  \  | (___ | |      | |   | |   
+    / /\ \  \___ \| |      | |   | |    
+   / ____ \ ____) | |____ _| |_ _| |_  
+  /_/    \_\_____/ \_____|_____|_____|
+
+ ______      _____  __  __ ______ _____  
+|  ____/\   |  __ \|  \/  |  ____|  __ \ 
+| |__ /  \  | |__) | \  / | |__  | |__) |
+|  __/ /\ \ |  _  /| |\/| |  __| |  _  / 
+| | / ____ \| | \ \| |  | | |____| | \ \ 
+|_|/_/    \_\_|  \_\_|  |_|______|_|  \_\
+                </pre>
+            </div>
+            <div class="boot-loader" id="boot-loader" aria-hidden="true">
+                <p class="boot-loader-label">LOADING</p>
+                <div class="boot-loader-track">
+                    <div class="boot-loader-fill" id="boot-loader-fill"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="desktop-shell" id="desktop-shell" aria-label="ASCII Farmer Desktop">
+            <header class="desktop-menubar">
+                <div class="desktop-menubar-left">
+                    <img class="desktop-menubar-favicon" src="./src/assets/jukeLTDFavicon.png" alt="ASCII Farmer">
+                    <nav class="desktop-menu-items" aria-label="Desktop Menu">
+                        <button class="desktop-menu-button" id="desktop-menu-options" type="button">Options</button>
+                    </nav>
+                </div>
+                <div class="desktop-menubar-right">
+                    <button class="desktop-zoom-btn" id="zoom-down-btn" type="button" style="display:none;" aria-label="Zoom out">&#x2212;</button>
+                    <button class="desktop-zoom-btn" id="zoom-up-btn" type="button" style="display:none;" aria-label="Zoom in">+</button>
+                </div>
+            </header>
+
+            <div class="desktop-workspace" id="desktop-workspace">
+                <div class="desktop-surface" id="desktop-surface">
+                    <main class="desktop-main" id="desktop-main">
+                        <!-- Game content is generated dynamically -->
+                    </main>
+
+                    <aside class="desktop-icon-column" id="desktop-icon-column" aria-label="Desktop Icons">
+                        <button class="desktop-icon" id="desktop-icon-resources" type="button" data-window-id="mac-window-resource-bar">
+                            <span class="desktop-icon-glyph" aria-hidden="true">¤</span>
+                            <span class="desktop-icon-label">Resources</span>
+                        </button>
+                        <button class="desktop-icon" id="desktop-icon-tools" type="button" data-window-id="mac-window-toolbox-container">
+                            <span class="desktop-icon-glyph" aria-hidden="true">⚒</span>
+                            <span class="desktop-icon-label">Tools</span>
+                        </button>
+                        <button class="desktop-icon" id="desktop-icon-field" type="button" data-window-id="mac-window-field">
+                            <span class="desktop-icon-glyph" aria-hidden="true">▦</span>
+                            <span class="desktop-icon-label">Field</span>
+                        </button>
+                        <button class="desktop-icon" id="desktop-icon-store" type="button" data-window-id="mac-window-store">
+                            <span class="desktop-icon-glyph" aria-hidden="true">🗠</span>
+                            <span class="desktop-icon-label">Store</span>
+                        </button>
+                        <button class="desktop-icon desktop-icon--hidden" id="desktop-icon-upgrades" type="button" data-window-id="mac-window-upgrades-container">
+                            <span class="desktop-icon-glyph" aria-hidden="true">✣</span>
+                            <span class="desktop-icon-label">Upgrades</span>
+                        </button>
+                        <button class="desktop-icon desktop-icon--hidden" id="desktop-icon-quests" type="button" data-window-id="mac-window-quests">
+                            <span class="desktop-icon-glyph" aria-hidden="true">✉</span>
+                            <span class="desktop-icon-label">Quests</span>
+                        </button>
+                        <button class="desktop-icon desktop-icon--hidden" id="desktop-icon-network" type="button" data-scene="worldMap">
+                            <span class="desktop-icon-glyph" aria-hidden="true">&#x229F;</span>
+                            <span class="desktop-icon-label">Network</span>
+                        </button>
+                    </aside>
+
+                    <div class="desktop-secondary-windows" id="desktop-secondary-windows">
+                        <div class="mac-window" id="mac-window-options">
+            <div class="mac-titlebar">
+                <button class="mac-close-btn" aria-label="Collapse Options" type="button" title="Collapse Options"></button>
+                <span class="mac-title">Options</span>
+            </div>
+            <div class="mac-content" id="options-content">
+                <div class="mac-content-inner">
+                    <div class="options-toggle-row">
+                        <button id="dark-mode-toggle" class="dark-mode-toggle" aria-label="Switch to dark mode" title="Switch to dark mode">&#x263D;</button>
+                        <button id="keybinds-toggle" class="dark-mode-toggle" aria-label="Open keybind settings" title="Edit keybinds">⇄</button>
+                        <button id="audio-toggle" class="dark-mode-toggle" aria-label="Turn audio off" title="Toggle audio">♪</button>
+                        <button id="text-scale-toggle" class="dark-mode-toggle" aria-label="Open text scale controls" title="Text Scale">Aa</button>
+                        <button id="replay-tutorial-button" class="dark-mode-toggle" aria-label="Replay tutorial" title="Replay Tutorial">?</button>
+                        <button id="reset-save-button" class="dark-mode-toggle reset-save-button" aria-label="Reset save data" title="Reset Save">↺</button>
+                        <button id="export-save-button" class="dark-mode-toggle" aria-label="Export save data" title="Export Save">↑</button>
+                        <button id="import-save-button" class="dark-mode-toggle" aria-label="Import save data" title="Import Save">↓</button>
+                    </div>
+
+                    <div class="options-sections-stack" id="options-sections-stack">
+                        <section class="options-subsection" id="options-stats-section" aria-label="Stats Section">
+                            <button class="options-subsection-toggle" id="options-stats-toggle" type="button" aria-expanded="true" aria-controls="stats-content-inner">
+                                <span class="options-subsection-title">Stats</span>
+                                <span class="options-subsection-indicator" aria-hidden="true">−</span>
+                            </button>
+                            <div class="options-subsection-body" id="stats-content-inner"></div>
+                        </section>
+
+                        <section class="options-subsection" id="options-achievements-section" aria-label="Achievements Section">
+                            <button class="options-subsection-toggle" id="options-achievements-toggle" type="button" aria-expanded="true" aria-controls="achievements-content-inner">
+                                <span class="options-subsection-title">Achievements</span>
+                                <span class="options-subsection-indicator" aria-hidden="true">−</span>
+                            </button>
+                            <div class="options-subsection-body" id="achievements-content-inner"></div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mac-window" id="mac-window-textscale">
+            <div class="mac-titlebar">
+                <button class="mac-close-btn" aria-label="Close Text Scale" type="button" title="Close Text Scale"></button>
+                <span class="mac-title">Text Scale</span>
+            </div>
+            <div class="mac-content" id="textscale-content">
+                <div class="mac-content-inner">
+                    <div class="text-scale-panel">
+                        <p class="text-scale-label">Current Text Scale</p>
+                        <div class="text-scale-controls">
+                            <button class="text-scale-btn" id="text-scale-decrease" type="button" aria-label="Decrease text scale">←</button>
+                            <span class="text-scale-value" id="text-scale-value">13px</span>
+                            <button class="text-scale-btn" id="text-scale-increase" type="button" aria-label="Increase text scale">→</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+                    </div>
+                </div>
+
+                <footer class="desktop-credits">
+                    <p>by <a class="plain-text-link" href="https://jukeltd.com">Juke LTD.</a></p>
+                    <p><a class="plain-text-link" href="./attributions.html">Attributions &amp; Disclaimers</a></p>
+                </footer>
+                <div class="desktop-version">v0.1.0</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Net-Space canvas: full-screen, hidden until worldMap scene active -->
+    <canvas id="netspace-canvas" aria-hidden="true" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:10;"></canvas>
+
+    <!-- Node overview shell: hidden until nodeOverview scene active -->
+    <div id="node-overview-shell" aria-hidden="true" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:50;"></div>
+
+    <script type="module" src="./src/js/main.js"></script>
+    <script type="module" src="./src/js/ui/darkMode.js"></script>
+</body>
+</html>

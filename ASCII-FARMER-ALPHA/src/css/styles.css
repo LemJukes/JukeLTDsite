@@ -1,0 +1,3610 @@
+/* src/css/styles.css */
+/* Base styles */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+:root {
+    --ui-text-scale: 12px;
+    --desktop-menu-height: 24px;
+    --desktop-icon-width: 84px;
+    --desktop-icon-gap: 10px;
+    --desktop-edge: 10px;
+    --desktop-bg: #bdbdbd;
+    --desktop-panel: #efefef;
+    --desktop-border: #000;
+}
+
+body {
+    font-family: monospace;
+    font-size: var(--ui-text-scale);
+    display: block;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    max-width: 100vw;
+    padding: 0;
+    box-sizing: border-box;
+    text-align: left;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    background: var(--desktop-bg);
+    color: #000;
+}
+
+button {
+    font-family: inherit;
+}
+
+.plain-text-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.plain-text-link:visited,
+.plain-text-link:hover,
+.plain-text-link:active,
+.plain-text-link:focus {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Header styles */
+header {
+    width: 100%;
+    padding: 8px 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: left;
+}
+
+header pre {
+    margin: 0;
+    padding: 0.15em 0 0.25em;
+    display: block;
+    max-width: 100%;
+    font-size: clamp(0.31rem, 1.5vw, 1rem);
+    line-height: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.app-shell {
+    min-height: 100vh;
+}
+
+.boot-sequence {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 24px;
+    background: #bdbdbd;
+    z-index: 3000;
+    opacity: 1;
+    transition: opacity 0.35s ease;
+}
+
+.boot-sequence--netspace {
+    background: radial-gradient(circle at center, #082208 0%, #041104 62%, #020902 100%);
+}
+
+.boot-sequence--netspace .boot-title-panel,
+.boot-sequence--netspace .boot-loader {
+    background: #040d04;
+    border-color: #5acc5a;
+    color: #8fff8f;
+    box-shadow: inset 1px 1px 0 #0f2a0f, inset -1px -1px 0 #020702;
+}
+
+.boot-sequence--netspace .boot-loader-label {
+    color: #8fff8f;
+}
+
+.boot-sequence--netspace .boot-loader-track {
+    background: #061406;
+    border-color: #2f6f2f;
+}
+
+.boot-sequence--netspace .boot-loader-fill {
+    background: linear-gradient(90deg, #3b933b 0%, #8fff8f 100%);
+}
+
+.boot-sequence--hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.boot-title-panel,
+.boot-loader {
+    width: min(720px, calc(100vw - 48px));
+    border: 2px solid #000;
+    background: #efefef;
+    box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #7a7a7a;
+    padding: 16px;
+}
+
+.boot-title-panel {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 220px;
+}
+
+.boot-title-panel pre {
+    margin: 0;
+    font-size: clamp(0.34rem, 1.22vw, 0.85rem);
+    line-height: 1;
+    overflow: auto hidden;
+}
+
+.boot-loader {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.boot-loader--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.boot-loader-label {
+    margin: 0;
+    text-align: center;
+    letter-spacing: 0.16em;
+}
+
+.boot-loader-track {
+    height: 20px;
+    border: 2px solid #000;
+    background: #fff;
+    padding: 2px;
+}
+
+.boot-loader-fill {
+    width: 0%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        90deg,
+        #000 0px,
+        #000 2px,
+        #d9d9d9 2px,
+        #d9d9d9 4px
+    );
+    transition: width 0.12s linear;
+}
+
+.desktop-shell {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+.desktop-shell--visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.desktop-menubar {
+    height: var(--desktop-menu-height);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 2px 8px;
+    border-bottom: 2px solid #000;
+    background: #efefef;
+    gap: 12px;
+}
+
+.desktop-menubar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.desktop-menubar-favicon {
+    width: 16px;
+    height: 16px;
+    image-rendering: pixelated;
+    display: block;
+}
+
+.desktop-menu-items {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.desktop-menu-button {
+    font: inherit;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 1px 6px;
+    min-height: 18px;
+    cursor: pointer;
+}
+
+.desktop-menu-button:hover,
+.desktop-menu-button:focus-visible {
+    outline: 1px solid #000;
+    outline-offset: -1px;
+}
+
+.desktop-workspace {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    isolation: isolate;
+}
+
+.desktop-workspace::before,
+.desktop-workspace::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    transition: opacity 5s ease;
+}
+
+.desktop-workspace::before {
+    background: repeating-conic-gradient(#7a7a7a 0% 25%, #bdbdbd 0% 50%) 0 0 / 2px 2px;
+    opacity: 1;
+}
+
+.desktop-workspace::after {
+    background: repeating-conic-gradient(#000 0% 25%, #1c1c1c 0% 50%) 0 0 / 2px 2px;
+    opacity: 0;
+}
+
+.desktop-surface {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--desktop-edge);
+}
+
+.desktop-main {
+    position: absolute;
+    inset: var(--desktop-edge) calc(var(--desktop-icon-width) + (var(--desktop-edge) * 2) + var(--desktop-icon-gap)) 48px var(--desktop-edge);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+.desktop-icon-column {
+    position: absolute;
+    top: var(--desktop-edge);
+    right: var(--desktop-edge);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--desktop-icon-gap);
+    width: var(--desktop-icon-width);
+}
+
+.desktop-icon {
+    font: inherit;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    padding: 2px;
+    cursor: default;
+}
+
+.desktop-icon--hidden {
+    display: none;
+}
+
+.desktop-icon-glyph {
+    width: 34px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #000;
+    background: #efefef;
+    color: #000;
+    font-size: 2em;
+    line-height: 1;
+    transition: background 5s ease, color 5s ease, border-color 5s ease;
+}
+
+#desktop-icon-field .desktop-icon-glyph {
+    padding-top: 0;
+    font-size: 2em;
+    line-height: 0.9;
+    overflow: hidden;
+}
+
+.desktop-icon-label {
+    display: inline-block;
+    min-width: 100%;
+    text-align: center;
+    padding: 0 2px;
+    line-height: 1.15;
+    transition: background 5s ease, color 5s ease;
+}
+
+.desktop-icon.is-selected .desktop-icon-glyph,
+.desktop-icon.is-selected .desktop-icon-label {
+    background: #3a3a3a;
+    color: #fff;
+}
+
+.desktop-icon.is-selected .desktop-icon-label {
+    display: inline;
+}
+
+.desktop-icon--netspace-glow .desktop-icon-glyph {
+    animation: desktop-netspace-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes desktop-netspace-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(0, 0, 0, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 0 7px rgba(0, 0, 0, 0.12);
+    }
+}
+
+body:not(.light) .desktop-icon--netspace-glow .desktop-icon-glyph,
+body.dark .desktop-icon--netspace-glow .desktop-icon-glyph {
+    animation-name: desktop-netspace-glow-dark;
+}
+
+@keyframes desktop-netspace-glow-dark {
+    0%, 100% {
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 0 0 0 rgba(255, 255, 255, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 0 7px rgba(255, 255, 255, 0.14);
+    }
+}
+
+.desktop-icon:focus-visible {
+    outline: 1px dotted #000;
+    outline-offset: 1px;
+}
+
+.desktop-secondary-windows {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.ambient-farmr-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.ambient-farmr {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 96px;
+    height: 96px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease, transform 900ms linear;
+    will-change: transform;
+}
+
+.ambient-farmr.is-visible {
+    opacity: 1;
+}
+
+.ambient-farmr-sprite {
+    display: block;
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+}
+
+.ambient-farmr-bubble {
+    position: absolute;
+    bottom: 66px;
+    width: min(250px, calc(100vw - 72px));
+    max-width: 250px;
+    margin: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 220ms ease, visibility 220ms ease;
+}
+
+.ambient-farmr-bubble.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.ambient-farmr-bubble .mac-titlebar {
+    justify-content: center;
+    padding-inline: 6px;
+}
+
+.ambient-farmr-bubble .mac-title {
+    max-width: calc(100% - 12px);
+}
+
+.ambient-farmr-bubble .mac-dialog-content {
+    padding: 9px 12px 10px;
+}
+
+.ambient-farmr-bubble .mac-dialog-message {
+    margin: 0;
+}
+
+.ambient-farmr-bubble::before,
+.ambient-farmr-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    width: 0;
+    height: 0;
+}
+
+.ambient-farmr-bubble--left {
+    left: calc(100% - 10px);
+}
+
+.ambient-farmr-bubble--left::before {
+    left: 18px;
+    border-style: solid;
+    border-width: 13px 13px 0 0;
+    border-color: #000 transparent transparent transparent;
+}
+
+.ambient-farmr-bubble--left::after {
+    left: 20px;
+    bottom: -10px;
+    border-style: solid;
+    border-width: 10px 10px 0 0;
+    border-color: #fff transparent transparent transparent;
+}
+
+.ambient-farmr-bubble--right {
+    right: calc(100% - 10px);
+}
+
+.ambient-farmr-bubble--right::before {
+    right: 18px;
+    border-style: solid;
+    border-width: 13px 0 0 13px;
+    border-color: #000 transparent transparent transparent;
+}
+
+.ambient-farmr-bubble--right::after {
+    right: 20px;
+    bottom: -10px;
+    border-style: solid;
+    border-width: 10px 0 0 10px;
+    border-color: #fff transparent transparent transparent;
+}
+
+.desktop-secondary-windows > .mac-window {
+    position: absolute;
+    top: 42px;
+    left: 24px;
+    margin: 0;
+    display: none;
+    pointer-events: auto;
+}
+
+.desktop-window {
+    min-width: 0;
+    width: fit-content;
+}
+
+.desktop-window--resizable {
+    min-height: 0;
+}
+
+.desktop-window-launch-ghost {
+    position: absolute;
+    border: 1px solid #000;
+    background: transparent;
+    pointer-events: none;
+    z-index: 1200;
+    opacity: 0.95;
+    transition:
+        left 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        top 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        width 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        height 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        opacity 210ms ease;
+}
+
+.desktop-window-launch-ghost--active {
+    opacity: 1;
+}
+
+#mac-window-field {
+    width: fit-content;
+}
+
+#mac-window-field.desktop-window--resizable {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+#mac-window-field.desktop-window--resizable .mac-content {
+    display: grid;
+    grid-template-rows: 1fr;
+    min-height: 0;
+}
+
+#mac-window-field.desktop-window--resizable .mac-content-inner {
+    width: 100%;
+    min-height: 0;
+}
+
+#mac-window-field.desktop-window--resizable .field-container {
+    margin: 0;
+}
+
+.desktop-window-resize-handle {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid #000;
+    border-radius: 0;
+    background:
+        linear-gradient(135deg, transparent 0 45%, #000 45% 52%, transparent 52% 100%),
+        linear-gradient(135deg, transparent 0 65%, #000 65% 72%, transparent 72% 100%),
+        #fff;
+    cursor: nwse-resize;
+    z-index: 4;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease, transform 140ms ease, background 140ms ease;
+    transform: translateY(2px);
+}
+
+.desktop-window-resize-handle:focus-visible {
+    outline: 1px dotted #000;
+    outline-offset: 1px;
+}
+
+#mac-window-field.desktop-window--resize-hint .desktop-window-resize-handle,
+#mac-window-field.is-resizing .desktop-window-resize-handle {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.desktop-window.is-open {
+    display: block;
+}
+
+.desktop-window.is-dragging {
+    user-select: none;
+}
+
+.desktop-window.is-resizing {
+    user-select: none;
+}
+
+.desktop-window .mac-titlebar {
+    cursor: move;
+}
+
+.desktop-window .mac-close-btn {
+    cursor: pointer;
+}
+
+.desktop-window .mac-content {
+    display: block;
+}
+
+.desktop-window .mac-content.mac-content--collapsed {
+    display: block;
+    grid-template-rows: 1fr;
+}
+
+.desktop-secondary-windows > #mac-window-textscale {
+    left: 96px;
+}
+
+#mac-window-textscale.desktop-window {
+    width: fit-content;
+    max-width: 210px;
+}
+
+#mac-window-textscale .mac-content-inner {
+    width: fit-content;
+}
+
+.desktop-credits {
+    position: absolute;
+    left: 12px;
+    bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+
+.desktop-credits p {
+    margin: 0;
+}
+
+.desktop-version {
+    position: absolute;
+    right: 12px;
+    bottom: 8px;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+
+#mac-window-options,
+#mac-window-toolbox-container {
+    width: auto;
+    min-width: 0;
+}
+
+
+
+/* Main content area */
+main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 1200px;
+    padding: 5px;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+/* Resource Bar Styles */
+.resource-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 600px;
+    margin: 5px 0;
+}
+
+.resource-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: stretch;
+    width: min(100%, 600px);
+    max-width: 600px;
+    padding: 4px 6px;
+    border: dashed 2.5px #000;    
+    gap: 6px;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.resource-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px;
+    min-width: 0;
+    width: 100%;
+    gap: 8px;
+    line-height: 1.1;
+}
+
+.resource-item--offset::before {
+    content: "\00a0";
+    display: block;
+    line-height: 1;
+}
+
+.resource-item span {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 4px;
+    border: 1px solid #000;
+    background: #fff;
+    min-width: 56px;
+    box-sizing: border-box;
+    justify-content: center;
+}
+
+.resource-value {
+    --resource-value-bg: #fff;
+    --resource-flash-color: rgba(240, 240, 240, 0.45);
+    position: relative;
+    transition: color 5s ease, border-color 5s ease;
+}
+
+.resource-value--flash {
+    animation: resourceValueFlash 340ms ease-out;
+}
+
+@keyframes resourceValueFlash {
+    0% {
+        background-color: var(--resource-flash-color);
+    }
+    100% {
+        background-color: var(--resource-value-bg);
+    }
+}
+
+.resource-item-label {
+    border: none;
+    background: transparent;
+    padding: 0;
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+}
+
+.resource-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+    padding: 4px;
+    gap: 4px;
+    min-width: 74px;
+    flex: 1 1 180px;
+    border: 1px solid #000;
+    background: #fff;
+}
+
+.resource-group strong {
+    font-size: 0.95em;
+    line-height: 1;
+    text-align: left;
+}
+
+.resource-subitem {
+    font-size: 0.85em;
+    min-width: 0;
+    width: 100%;
+}
+
+/* Toolbox Styles */
+.toolbox-container {
+    font: inherit;
+    border: 2px dashed black;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    margin: 5px 0;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.toolbox-section-box {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid currentColor;
+    padding: 4px;
+    box-sizing: border-box;
+}
+
+.toolbox-selected-tool {
+    margin: 0;
+    padding: 2px 6px;
+    border: 1px solid #000;
+    background: #fff;
+    width: 100%;
+    max-width: 280px;
+}
+
+.toolbox-buttons {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.toolbox-button {
+    font: inherit;
+}
+
+.toolbox-seed-selector {
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.toolbox-selected-seed {
+    margin: 0;
+    padding: 2px 6px;
+    border: 1px solid #000;
+    background: #fff;
+    width: 100%;
+    max-width: 280px;
+}
+
+.toolbox-seed-buttons {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.toolbox-seed-button {
+    font: inherit;
+}
+
+/* Container Title Styles */
+.container-title {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-weight: bold;
+    font-size: clamp(1.2em, 4vw, 1.5em);
+    padding: .15em;
+    margin: .15em;
+    text-align: center;
+}
+
+/* Field Styles */
+.field-container {
+    --field-cell-size: 56px;
+    display: grid;
+    /* columns/rows are overridden at runtime by JS */
+    grid-template-columns: repeat(9, var(--field-cell-size));
+    grid-template-rows: repeat(9, var(--field-cell-size));
+    gap: 2px;
+    width: fit-content;
+    max-width: none;
+    padding: 5px;
+    border: 2px dashed black;
+    box-sizing: border-box;
+    margin: 5px 0;
+}
+
+/* Plot Button Styles */
+.plotButton {
+    font: inherit;
+    font-size: clamp(1rem, calc(var(--field-cell-size) * 0.28), 1.6rem);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.plotButton.unowned-plot {
+    background: transparent;
+    border: none;
+    color: transparent;
+    cursor: default;
+}
+
+.plotButton.plot-purchase-eligible {
+    background: rgba(210, 210, 210, 0.35);
+    border: 1px solid rgba(140, 140, 140, 0.8);
+    border-radius: 8px;
+    color: transparent;
+    cursor: pointer;
+}
+
+.plotButton.plot-purchase-eligible:hover {
+    background: rgba(210, 210, 210, 0.55);
+}
+
+.plotButton.destroyed-plot {
+    color: #5f5f5f;
+    background: #d8d8d8;
+    border: 1px solid #7a7a7a;
+    opacity: 0.85;
+}
+
+/* ── Autofarmer GIF sprite ─────────────────────────────────────────────────── */
+.plotButton.autofarmer-plot {
+    padding: 0;
+    position: relative;
+    background: #f4f4f4;
+    border: 1px solid #000;
+    transition: background 5s ease, color 5s ease, border-color 5s ease;
+}
+
+/* All three GIFs hidden by default; specific rules below reveal the right one */
+.plotButton .autofarmer-gif {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+}
+
+/* Light mode: show light GIF */
+.plotButton.autofarmer-plot:not(.autofarmer-error) .autofarmer-gif-light {
+    display: block;
+}
+
+/* Error/stall state: show error GIF */
+.plotButton.autofarmer-error .autofarmer-gif-error {
+    display: block;
+}
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+.plotButton.powerplant-plot,
+.plotButton.processingstation-plot {
+    padding: 0;
+    position: relative;
+    background: #f4f4f4;
+    border: 1px solid #000;
+}
+
+/* All three gifs hidden by default; specific rules below reveal the right one */
+.plotButton .powerplant-gif,
+.plotButton .processingstation-gif {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+}
+
+/* Light mode: show light gif */
+.plotButton.powerplant-plot:not(.powerplant-error) .powerplant-gif-light {
+    display: block;
+}
+
+.plotButton.powerplant-error .powerplant-gif-error {
+    display: block;
+}
+
+.plotButton.processingstation-plot:not(.processingstation-error) .processingstation-gif-light {
+    display: block;
+}
+
+.plotButton.processingstation-error .processingstation-gif-error {
+    display: block;
+}
+
+/* Store Styles */
+.store-container {
+    font: inherit;
+    border: 2px dashed black;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px;
+    margin-top: 8px;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.store-section-title,
+.store-secton-title {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 3px 4px;
+    gap: 0;
+    font-size: 0.95em;
+    border: 1px solid #000;
+    background: #f7f7f7;
+    line-height: 1.15;
+}
+
+.store-section-title > .store-section,
+.store-secton-title > .store-section {
+    margin-top: 6px;
+}
+
+.store-section {
+    font-weight: normal;
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-items: stretch;
+    gap: 4px;
+    padding: 1px;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.item-title {
+    font: inherit;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: 6px;
+    row-gap: 4px;
+    padding: 4px;
+    margin: 0;
+    width: 100%;
+    min-height: 0;
+    text-align: left;
+    border: 1px solid #000;
+    background: #fff;
+    line-height: 1.1;
+    font-size: 0.92em;
+}
+
+.item-title-label {
+    display: inline-block;
+    min-width: 124px;
+    flex: 1 1 124px;
+    text-align: left;
+}
+
+.store-button {
+    font: inherit;
+}
+
+.store-section-focus-select {
+    min-height: 22px;
+    max-width: 82px;
+    flex: 0 0 82px;
+    font: inherit;
+    border: 1px solid #000;
+    background: #fff;
+}
+
+.item-title .store-button,
+.item-title .item-price {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    margin: 0;
+}
+
+.item-title .item-price {
+    padding: 1px 6px;
+    border: 1px solid #000;
+    background: #f9f9f9;
+    white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+    .item-title {
+        flex-wrap: wrap;
+    }
+
+    .store-section-focus-select {
+        flex: 1 1 96px;
+        max-width: 100%;
+    }
+}
+
+.quests-container {
+    font: inherit;
+    border: 2px dashed black;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+    margin-top: 8px;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.quest-card,
+.quest-empty-state {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px;
+}
+
+.quest-pager {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.quest-pager-button {
+    min-width: 38px;
+    padding-inline: 0;
+}
+
+.quest-page-label {
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.quest-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.quest-card-title,
+.quest-card-number,
+.quest-card-issuer,
+.quest-card-flavor,
+.quest-meta-row,
+.quest-section-heading,
+.quest-delivery-status,
+.quest-popup-meta,
+.quest-popup-heading {
+    margin: 0;
+}
+
+.quest-card-title {
+    font-size: 1em;
+}
+
+.quest-card-number,
+.quest-card-issuer,
+.quest-meta-row,
+.quest-delivery-status,
+.quest-popup-meta,
+.quest-popup-heading {
+    font-size: 0.8em;
+}
+
+.quest-card-flavor,
+.quest-popup-flavor {
+    font-size: 0.85em;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.quest-section-heading,
+.quest-popup-heading {
+    font-weight: bold;
+}
+
+.quest-card-meta,
+.quest-popup-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.quest-requirements-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.82em;
+}
+
+.quest-requirements-table td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.quest-table-heading {
+    font-weight: bold;
+}
+
+.quest-row--ready td {
+    font-weight: bold;
+}
+
+.quest-table-ready-col {
+    width: 1.6em;
+    text-align: center;
+}
+
+.quest-requirements-table td.quest-table-ready-col {
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.quest-ready-indicator {
+    font-weight: bold;
+}
+
+.quest-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.quest-deliver-button:disabled,
+.quest-pager-button:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.quest-popup-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.quest-popup-intro-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.quest-farmr-sprite {
+    width: 64px;
+    height: auto;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+}
+
+.quest-card-intro {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.quest-card-intro-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.quest-popup-requirements {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 0.82em;
+}
+
+.item-price {
+    display: inline-block;
+    min-width: 56px;
+    padding: 1px 3px;
+    border: 1px solid #000;
+    background: #fff;
+}
+
+/* Upgrade Styles */
+.upgrades-container {
+    font: inherit;
+    border: 2px dashed black;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-around;
+    padding: 5px;
+    margin-top: 8px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.upgrades-section {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    padding: 2%;
+}
+
+.upgrade-button {
+    font: inherit;
+}
+
+#click-upgrades-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: start;
+    justify-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+
+#click-upgrades-section > .upgrades-section-title {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin: 0 0 4px 0;
+}
+
+#water-upgrades-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: start;
+    justify-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+
+#water-upgrades-section > .upgrades-section-title {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin: 0 0 4px 0;
+}
+
+#water-upgrade-group {
+    max-width: 320px;
+    width: 100%;
+    justify-self: center;
+}
+
+#water-auto-buyer-group {
+    max-width: 320px;
+    width: 100%;
+    justify-self: center;
+}
+
+.click-upgrade-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+    border: 1px solid #000;
+    background: #fff;
+    padding: 4px 6px;
+    width: 100%;
+    min-height: 0;
+}
+
+.click-upgrade-group-title {
+    margin: 0;
+    font-size: 0.95em;
+    border-bottom: 1px solid #000;
+    padding-bottom: 3px;
+}
+
+.click-upgrade-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+    text-align: center;
+}
+
+.expanded-click-label {
+    text-align: center;
+}
+
+.reset-save-button {
+    line-height: 1;
+}
+
+.clicks-display {
+    font: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 10px;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.stats-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* ── Achievements Window ───────────────────────────────────────────────────── */
+
+.achievements-display {
+    font: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 6px 10px;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.achievements-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.achievement-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid #000;
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+
+.achievement-item:last-child {
+    border-bottom: none;
+}
+
+.achievement-item-title {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: bold;
+}
+
+.achievement-item-value {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.achievement-item-reward {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.achievements-empty {
+    margin: 0;
+    font-size: 0.85em;
+    text-align: center;
+    padding: 4px 0;
+}
+
+.achievements-footer {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 2px solid #000;
+    font-size: 0.85em;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Media Queries for larger screens */
+@media screen and (max-width: 767px) {
+    .click-upgrade-group {
+        width: 100%;
+    }
+}
+
+@media screen and (min-width: 768px) {
+    .resource-bar {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 4px;
+    }
+
+    .resource-item {
+        min-width: 0;
+        flex: 1 1 0;
+    }
+
+    .resource-group {
+        min-width: 0;
+        flex: 1 1 0;
+    }
+
+    .field-container {
+        --field-cell-size: 60px;
+        gap: 5px;
+        padding: 10px;
+    }
+
+    body {
+        padding: 0 20px;
+    }
+}
+
+/* ── Dark Mode ─────────────────────────────────────────────────────────────── */
+
+.dark-mode-toggle {
+    font-size: 1.45em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    flex: 0 0 32px;
+}
+
+.options-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.options-sections-stack {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.options-subsection {
+    border: 1px solid #000;
+    background: #fff;
+    width: 100%;
+}
+
+.options-subsection-toggle {
+    font: inherit;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    border-bottom: 1px solid #000;
+    background: #f5f5f5;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.options-subsection--collapsed .options-subsection-toggle {
+    border-bottom: 0;
+}
+
+.options-subsection-title {
+    font-weight: bold;
+}
+
+.options-subsection-indicator {
+    min-width: 12px;
+    text-align: center;
+}
+
+.options-subsection-body {
+    width: 100%;
+}
+
+.options-subsection--collapsed .options-subsection-body {
+    display: none;
+}
+
+.text-scale-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    min-width: 176px;
+}
+
+.save-import-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+.save-import-label {
+    margin: 0;
+    font-size: 0.9em;
+}
+
+.save-import-textarea {
+    font: inherit;
+    font-size: 0.85em;
+    width: 260px;
+    height: 80px;
+    resize: vertical;
+    padding: 4px 6px;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+}
+
+.text-scale-label {
+    margin: 0;
+}
+
+.text-scale-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.text-scale-btn {
+    font: inherit;
+    min-width: 32px;
+    min-height: 28px;
+}
+
+.text-scale-value {
+    min-width: 54px;
+    text-align: center;
+    font-weight: bold;
+}
+
+#keybinds-toggle {
+    line-height: 1;
+}
+
+.dark-mode-toggle img {
+    width: 2em;
+    height: 2em;
+    display: block;
+}
+
+/* Smooth crossfade for all elements that change color in dark mode */
+body,
+.resource-bar,
+.resource-panel,
+.resource-group,
+.resource-item span,
+.resource-item-label,
+.toolbox-container,
+.toolbox-selected-tool,
+.toolbox-selected-seed,
+.field-container,
+.store-container,
+.quests-container,
+.item-title,
+.item-price,
+.upgrades-container,
+.upgrades-section-title,
+.click-upgrade-group,
+.click-upgrade-group-title,
+.clicks-display,
+.achievements-display,
+.achievement-item,
+.achievements-footer,
+.mac-window,
+.mac-close-btn,
+.quest-card,
+.quest-empty-state,
+.quest-page-label,
+.quest-requirements-table td,
+.boot-sequence,
+.boot-title-panel,
+.boot-loader,
+.boot-loader-track,
+.desktop-menubar,
+.desktop-workspace,
+.save-import-textarea {
+    transition: background 5s ease, color 5s ease, border-color 5s ease;
+}
+
+/* OS-level dark preference. body:not(.light) means the user hasn't explicitly
+   overridden back to light, so we respect the OS setting. */
+@media (prefers-color-scheme: dark) {
+    body:not(.light) {
+        background: #000;
+        color: #fff;
+    }
+
+    body:not(.light) .resource-bar {
+        border-color: #fff;
+    }
+
+    body:not(.light) .resource-item span {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .resource-value {
+        --resource-value-bg: #000;
+    }
+
+    body:not(.light) .resource-group {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .toolbox-container {
+        border-color: #fff;
+    }
+
+    body:not(.light) .toolbox-selected-tool,
+    body:not(.light) .toolbox-selected-seed {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .field-container {
+        border-color: #fff;
+    }
+
+    body:not(.light) .plotButton.autofarmer-plot {
+        background: #000;
+        border-color: #fff;
+    }
+
+    body:not(.light) .plotButton.autofarmer-plot:not(.autofarmer-error) .autofarmer-gif-light {
+        display: none;
+    }
+
+    body:not(.light) .plotButton.autofarmer-plot:not(.autofarmer-error) .autofarmer-gif-dark-ver {
+        display: block;
+    }
+
+    body:not(.light) .plotButton.powerplant-plot,
+    body:not(.light) .plotButton.processingstation-plot {
+        background: #000;
+        border-color: #fff;
+    }
+
+    body:not(.light) .plotButton.powerplant-plot:not(.powerplant-error) .powerplant-gif-light,
+    body:not(.light) .plotButton.processingstation-plot:not(.processingstation-error) .processingstation-gif-light {
+        display: none;
+    }
+
+    body:not(.light) .plotButton.powerplant-plot:not(.powerplant-error) .powerplant-gif-dark-ver,
+    body:not(.light) .plotButton.processingstation-plot:not(.processingstation-error) .processingstation-gif-dark-ver {
+        display: block;
+    }
+
+    body:not(.light) .store-container {
+        border-color: #fff;
+    }
+
+    body:not(.light) .store-section-title,
+    body:not(.light) .store-secton-title {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .quests-container {
+        border-color: #fff;
+    }
+
+    body:not(.light) .item-title {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .store-section-focus-select {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .item-price {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .upgrades-container {
+        border-color: #fff;
+    }
+
+    body:not(.light) .upgrades-section-title {
+        color: #fff;
+    }
+
+    body:not(.light) .click-upgrade-group {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .click-upgrade-group-title {
+        border-bottom-color: #fff;
+    }
+
+    body:not(.light) .clicks-display {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .achievements-display {
+        background: #000;
+        color: #fff;
+    }
+
+    body:not(.light) .achievement-item {
+        border-bottom-color: #fff;
+    }
+
+    body:not(.light) .achievements-footer {
+        border-top-color: #fff;
+    }
+
+    body:not(.light) .boot-sequence {
+        background: #000;
+    }
+
+    body:not(.light) .boot-title-panel,
+    body:not(.light) .boot-loader {
+        background: #000;
+        border-color: #fff;
+        box-shadow: inset 1px 1px 0 #333, inset -1px -1px 0 #000;
+    }
+
+    body:not(.light) .boot-loader-track {
+        background: #111;
+        border-color: #fff;
+    }
+
+    body:not(.light) .boot-loader-fill {
+        background: repeating-linear-gradient(
+            90deg,
+            #fff 0px,
+            #fff 2px,
+            #333 2px,
+            #333 4px
+        );
+    }
+
+    body:not(.light) .desktop-menubar {
+        background: #000;
+        border-bottom-color: #fff;
+    }
+
+    body:not(.light) .desktop-menu-button:hover,
+    body:not(.light) .desktop-menu-button:focus-visible {
+        outline-color: #fff;
+    }
+
+    body:not(.light) .desktop-workspace::before {
+        opacity: 0;
+    }
+
+    body:not(.light) .desktop-workspace::after {
+        opacity: 1;
+    }
+
+    body:not(.light) .desktop-icon-glyph {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+
+    body:not(.light) .desktop-icon.is-selected .desktop-icon-glyph,
+    body:not(.light) .desktop-icon.is-selected .desktop-icon-label {
+        background: #bdbdbd;
+        color: #000;
+    }
+
+    body:not(.light) .save-import-textarea {
+        background: #000;
+        border-color: #fff;
+        color: #fff;
+    }
+}
+
+/* body.dark — user explicitly chose dark (active even when OS is light) */
+body.dark {
+    background: #000;
+    color: #fff;
+}
+
+body.dark .resource-bar {
+    border-color: #fff;
+}
+
+body.dark .resource-item span {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .resource-value {
+    --resource-value-bg: #000;
+}
+
+body.dark .resource-group {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .toolbox-container {
+    border-color: #fff;
+}
+
+body.dark .toolbox-selected-tool,
+body.dark .toolbox-selected-seed {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .field-container {
+    border-color: #fff;
+}
+
+body.dark .plotButton.autofarmer-plot {
+    background: #000;
+    border-color: #fff;
+}
+
+body.dark .plotButton.autofarmer-plot:not(.autofarmer-error) .autofarmer-gif-light {
+    display: none;
+}
+
+body.dark .plotButton.autofarmer-plot:not(.autofarmer-error) .autofarmer-gif-dark-ver {
+    display: block;
+}
+
+body.dark .plotButton.powerplant-plot,
+body.dark .plotButton.processingstation-plot {
+    background: #000;
+    border-color: #fff;
+}
+
+body.dark .plotButton.powerplant-plot:not(.powerplant-error) .powerplant-gif-light,
+body.dark .plotButton.processingstation-plot:not(.processingstation-error) .processingstation-gif-light {
+    display: none;
+}
+
+body.dark .plotButton.powerplant-plot:not(.powerplant-error) .powerplant-gif-dark-ver,
+body.dark .plotButton.processingstation-plot:not(.processingstation-error) .processingstation-gif-dark-ver {
+    display: block;
+}
+
+body.dark .store-container {
+    border-color: #fff;
+}
+
+body.dark .store-section-title,
+body.dark .store-secton-title {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .quests-container {
+    border-color: #fff;
+}
+
+body.dark .item-title {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .store-section-focus-select {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .item-price {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .upgrades-container {
+    border-color: #fff;
+}
+
+body.dark .upgrades-section-title {
+    color: #fff;
+}
+
+body.dark .click-upgrade-group {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .click-upgrade-group-title {
+    border-bottom-color: #fff;
+}
+
+body.dark .clicks-display {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .achievements-display {
+    background: #000;
+    color: #fff;
+}
+
+body.dark .achievement-item {
+    border-bottom-color: #fff;
+}
+
+body.dark .achievements-footer {
+    border-top-color: #fff;
+}
+
+body.dark .boot-sequence {
+    background: #000;
+}
+
+body.dark .boot-title-panel,
+body.dark .boot-loader {
+    background: #000;
+    border-color: #fff;
+    box-shadow: inset 1px 1px 0 #333, inset -1px -1px 0 #000;
+}
+
+body.dark .boot-loader-track {
+    background: #111;
+    border-color: #fff;
+}
+
+body.dark .boot-loader-fill {
+    background: repeating-linear-gradient(
+        90deg,
+        #fff 0px,
+        #fff 2px,
+        #333 2px,
+        #333 4px
+    );
+}
+
+body.dark .desktop-menubar {
+    background: #000;
+    border-bottom-color: #fff;
+}
+
+body.dark .desktop-menu-button:hover,
+body.dark .desktop-menu-button:focus-visible {
+    outline-color: #fff;
+}
+
+body.dark .desktop-workspace::before {
+    opacity: 0;
+}
+
+body.dark .desktop-workspace::after {
+    opacity: 1;
+}
+
+body.dark .desktop-icon-glyph {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+body.dark .desktop-icon.is-selected .desktop-icon-glyph,
+body.dark .desktop-icon.is-selected .desktop-icon-label {
+    background: #bdbdbd;
+    color: #000;
+}
+
+body.dark .save-import-textarea {
+    background: #000;
+    border-color: #fff;
+    color: #fff;
+}
+
+/* body.light — user explicitly chose light (overrides OS dark preference) */
+body.light {
+    background: #fff;
+    color: #000;
+}
+
+/* ── Mac System 6 Window Chrome ────────────────────────────────────────────── */
+
+/* Outer window shell */
+.mac-window {
+    width: 100%;
+    max-width: 600px;
+    border: 2px solid #000;
+    background: #fff;
+    margin: 8px 0;
+    box-sizing: border-box;
+}
+
+#mac-window-field.mac-window {
+    width: fit-content;
+    max-width: none;
+}
+
+/* Title bar — horizontal black/white pinstripes via repeating gradient */
+.mac-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 3px 4px;
+    border-bottom: 2px solid #000;
+    position: relative;
+    background: repeating-linear-gradient(
+        to bottom,
+        #000 0px,
+        #000 1px,
+        #fff 1px,
+        #fff 2px
+    );
+    transition: border-color 5s ease;
+}
+
+.mac-titlebar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        to bottom,
+        #fff 0px,
+        #fff 1px,
+        #000 1px,
+        #000 2px
+    );
+    opacity: 0;
+    transition: opacity 5s ease;
+    pointer-events: none;
+}
+
+.mac-titlebar > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Title text — white pill floats absolutely centered over the full-width pinstripes */
+.mac-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.72em;
+    background: #fff;
+    color: #000;
+    padding: 1px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.15;
+    max-width: calc(100% - 40px);
+    transition: background 5s ease, color 5s ease;
+}
+
+/* Close box (left) — small outlined square */
+.mac-close-btn {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    border: 1.5px solid #000;
+    background: #fff;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    font: inherit;
+    transition: background 5s ease, border-color 5s ease;
+}
+
+/* Collapsible content — CSS grid-row trick for smooth height animation */
+.mac-content {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.3s ease;
+}
+
+.mac-content--collapsed {
+    grid-template-rows: 0fr;
+}
+
+/* Inner shell — overflow:hidden is required for the grid trick to work */
+.mac-content-inner {
+    overflow: hidden;
+    min-height: 0;
+    width: 100%;
+}
+
+#mac-window-field .mac-content-inner {
+    width: fit-content;
+}
+
+/* ── Resource window — shrink to content ─────────────────────── */
+#mac-window-resource-bar.mac-window {
+    width: fit-content;
+    max-width: none;
+}
+
+#mac-window-resource-bar .mac-content-inner {
+    width: fit-content;
+}
+
+#mac-window-resource-bar .resource-bar {
+    /* override the global min(100%, 600px) */
+    width: fit-content;
+    max-width: none;
+}
+
+#mac-window-resource-bar .resource-group {
+    /* stop groups from growing to fill leftover space */
+    flex: 0 0 auto;
+}
+
+#mac-window-resource-bar .resource-panel {
+    /* override the global width: 100% from the mac-window group rule */
+    width: fit-content;
+    align-items: flex-start;
+}
+
+#mac-window-resource-bar #resource-bar-primary,
+#mac-window-resource-bar #resource-bar-secondary {
+    /* fill the compact window width while keeping content centered */
+    width: 100%;
+    justify-content: center;
+}
+
+#mac-window-resource-bar #resource-bar-primary .resource-group,
+#mac-window-resource-bar #resource-bar-secondary .resource-group {
+    width: 100%;
+    max-width: none;
+    align-items: center;
+    text-align: center;
+}
+
+#mac-window-resource-bar #resource-bar-primary .resource-group strong,
+#mac-window-resource-bar #resource-bar-secondary .resource-group strong {
+    width: 100%;
+    text-align: center;
+}
+
+/* Coins balance spans both lines (title + label row) and is more legible */
+#mac-window-resource-bar #resource-bar-primary .resource-group {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 4px;
+}
+
+#mac-window-resource-bar #resource-bar-primary .resource-group > strong {
+    grid-column: 1;
+    grid-row: 1;
+    text-align: left;
+}
+
+#mac-window-resource-bar #resource-bar-primary .resource-item {
+    display: contents;
+}
+
+#mac-window-resource-bar #resource-bar-primary .resource-item-label {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
+    text-align: left;
+}
+
+#mac-window-resource-bar #coins {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 96px;
+    padding: 2px 8px;
+    font-size: 2em;
+    line-height: 1;
+}
+
+/* ── Store window — shrink to content ────────────────────────── */
+#mac-window-store.mac-window {
+    width: fit-content;
+    max-width: none;
+}
+
+#mac-window-store .mac-content-inner {
+    width: fit-content;
+    max-height: min(68vh, 620px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#mac-window-store .store-container {
+    /* override width: 100% from the mac-window group rule */
+    width: fit-content;
+    min-width: 280px;
+    max-width: none;
+}
+
+#mac-window-store .store-section {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    width: 100%;
+    min-width: 0;
+}
+
+#mac-window-options .mac-content-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 8px;
+    padding: 8px;
+    max-height: min(72vh, 700px);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#mac-window-options .mac-content--collapsed .mac-content-inner {
+    padding: 0;
+}
+
+#mac-window-toolbox-container .mac-content-inner {
+    padding: 8px;
+}
+
+#mac-window-stats.mac-window {
+    width: fit-content;
+    max-width: none;
+    min-width: 260px;
+}
+
+#mac-window-stats .mac-content-inner {
+    width: fit-content;
+    padding: 8px;
+}
+
+#mac-window-stats .clicks-display {
+    width: min(320px, calc(100vw - 130px));
+}
+
+#mac-window-toolbox-container.mac-window {
+    width: fit-content;
+    max-width: none;
+    min-width: 260px;
+}
+
+#mac-window-toolbox-container .toolbox-container {
+    width: fit-content;
+    min-width: 260px;
+    align-items: stretch;
+}
+
+#mac-window-achievements.mac-window {
+    width: fit-content;
+    max-width: none;
+    min-width: 320px;
+}
+
+#mac-window-achievements .mac-content-inner {
+    width: fit-content;
+    max-height: min(68vh, 620px);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#mac-window-achievements .achievements-display {
+    width: min(420px, calc(100vw - 130px));
+}
+
+#mac-window-toolbox-container .mac-content--collapsed .mac-content-inner {
+    padding: 0;
+}
+
+.mac-notification-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.65);
+    z-index: 2000;
+}
+
+.mac-notification-overlay--visible {
+    display: flex;
+}
+
+.mac-dialog-window {
+    width: min(460px, 96vw);
+    margin: 0;
+}
+
+.autofarmer-detail-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    background: rgba(255, 255, 255, 0.42);
+    z-index: 2050;
+}
+
+.autofarmer-detail-overlay--visible {
+    display: block;
+}
+
+.autofarmer-detail-window {
+    position: absolute;
+    margin: 0;
+    max-width: none;
+    min-width: min(300px, calc(100vw - 16px));
+}
+
+.autofarmer-detail-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.autofarmer-detail-aside {
+    flex: 0 0 auto;
+    border: 1px solid currentColor;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.autofarmer-detail-main {
+    flex: 1 1 auto;
+    min-width: 220px;
+}
+
+.module-slot-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.module-slot-option-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid currentColor;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.module-slot-option-meta {
+    min-width: 0;
+}
+
+.module-slot-option-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: normal;
+}
+
+.module-slot-option-detail,
+.module-slot-option-cost {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    opacity: 0.92;
+}
+
+.module-slot-option-button {
+    white-space: nowrap;
+}
+
+.autofarmer-detail-sprite-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.autofarmer-detail-sprite {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.autofarmer-detail-table th {
+    text-align: right;
+}
+
+.autofarmer-detail-window--expand-right {
+    transform-origin: left center;
+    animation: stationDetailExpandRight 0.22s ease-out;
+}
+
+.autofarmer-detail-window--expand-left {
+    transform-origin: right center;
+    animation: stationDetailExpandLeft 0.22s ease-out;
+}
+
+.mac-welcome-window {
+    width: min(560px, 96vw);
+}
+
+.mac-welcome-body {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.mac-welcome-sprite {
+    width: 64px;
+    height: auto;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+}
+
+.mac-welcome-message {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 0.85em;
+    line-height: 1.5;
+}
+
+.mac-welcome-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.mac-welcome-progress {
+    font-size: 0.75em;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.mac-welcome-waiting {
+    font-size: 0.8em;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.mac-tutorial-flyout {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2100;
+}
+
+.mac-tutorial-flyout-window {
+    position: fixed;
+    width: min(560px, 96vw);
+    margin: 0;
+    pointer-events: auto;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Tutorial highlight ─────────────────────────────────────────────── */
+@keyframes tutorial-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 1px #000;
+    }
+    50% {
+        box-shadow: 0 0 0 4px #000, 0 0 0 5px rgba(0, 0, 0, 0.08);
+    }
+}
+
+@keyframes tutorial-pulse-dark {
+    0%, 100% {
+        box-shadow: 0 0 0 1px #fff;
+    }
+    50% {
+        box-shadow: 0 0 0 4px #fff, 0 0 0 5px rgba(255, 255, 255, 0.12);
+    }
+}
+
+.tutorial-highlight {
+    outline: 2px solid #000 !important;
+    outline-offset: 1px;
+    animation: tutorial-pulse 1.4s ease-in-out infinite;
+    position: relative;
+    z-index: 10;
+}
+
+body:not(.light) .tutorial-highlight,
+body.dark .tutorial-highlight {
+    outline-color: #fff !important;
+    animation-name: tutorial-pulse-dark;
+}
+
+/* ── Tutorial floating panel mode ──────────────────────────────────── */
+.mac-tutorial-floating-mode {
+    pointer-events: none;
+    background: transparent !important;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 24px;
+}
+
+.mac-tutorial-floating-mode .mac-window {
+    pointer-events: auto;
+}
+
+.mac-tutorial-floating {
+    width: min(440px, 96vw);
+    opacity: 0.97;
+}
+
+.mac-dialog-content {
+    padding: 12px;
+}
+
+.mac-dialog-message {
+    margin: 0 0 12px;
+    white-space: pre-wrap;
+    font-size: 0.85em;
+    line-height: 1.5;
+}
+
+.keybinds-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.65);
+    z-index: 1900;
+}
+
+.station-detail-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    background: rgba(255, 255, 255, 0.42);
+    z-index: 1950;
+}
+
+.station-detail-overlay--visible {
+    display: block;
+}
+
+.station-detail-window {
+    position: absolute;
+    margin: 0;
+    max-width: none;
+    min-width: min(300px, calc(100vw - 16px));
+}
+
+.station-detail-window--expand-right {
+    transform-origin: left center;
+    animation: stationDetailExpandRight 0.22s ease-out;
+}
+
+.station-detail-window--expand-left {
+    transform-origin: right center;
+    animation: stationDetailExpandLeft 0.22s ease-out;
+}
+
+@keyframes stationDetailExpandRight {
+    from {
+        transform: scaleX(0.08);
+        opacity: 0.7;
+    }
+
+    to {
+        transform: scaleX(1);
+        opacity: 1;
+    }
+}
+
+@keyframes stationDetailExpandLeft {
+    from {
+        transform: scaleX(0.08);
+        opacity: 0.7;
+    }
+
+    to {
+        transform: scaleX(1);
+        opacity: 1;
+    }
+}
+
+.station-detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+}
+
+.station-detail-meta,
+.station-detail-label {
+    margin: 0;
+    font-size: 0.82em;
+    text-align: left;
+}
+
+.station-detail-link-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.station-detail-select {
+    width: 100%;
+    flex: 1 1 auto;
+    font-size: 0.82em;
+}
+
+.station-detail-linked-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.station-detail-linked-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.station-detail-policy-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px 72px;
+    align-items: center;
+}
+
+.station-detail-policy-row--header {
+    padding-bottom: 2px;
+}
+
+.station-detail-policy-seed {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.station-detail-policy-header {
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+
+.station-detail-policy-header--numeric {
+    text-align: center;
+}
+
+/* ── Net-Space ───────────────────────────────────────────────────────────── */
+
+#netspace-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10;
+}
+
+.netspace-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 20;
+    pointer-events: none;
+}
+
+/* ── Scene Transitions ────────────────────────────────────────────────────── */
+
+.scene-transition-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 100ms ease;
+}
+
+.scene-transition-overlay--visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ── Keybinds ─────────────────────────────────────────────────────────────── */
+
+.keybinds-overlay--visible {
+    display: flex;
+}
+
+.keybinds-window {
+    width: min(560px, 96vw);
+    margin: 0;
+}
+
+.keybinds-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.keybinds-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.keybinds-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.keybinds-section + .keybinds-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #ccc;
+}
+
+.keybinds-section-heading {
+    margin: 0;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.keybinds-section-desc {
+    margin: 0;
+    font-size: 0.78em;
+    line-height: 1.4;
+    opacity: 0.75;
+}
+
+.keybinds-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.keybinds-action {
+    text-align: left;
+    font-size: 0.85em;
+    line-height: 1.2;
+}
+
+.keybinds-equals {
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.keybinds-input {
+    width: 52px;
+    text-align: center;
+    font: inherit;
+    border: 1.5px solid #000;
+    background: #fff;
+    color: #000;
+    padding: 2px 4px;
+}
+
+.keybinds-input--plot {
+    width: 48px;
+}
+
+.keybinds-input:focus-visible {
+    outline: 1px dotted #000;
+    outline-offset: 1px;
+}
+
+.keybinds-error {
+    margin: 0;
+    text-align: left;
+    font-size: 0.8em;
+}
+
+.keybinds-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mac-button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.mac-button {
+    min-width: 70px;
+    padding: 2px 12px;
+    border: 1.5px solid #000;
+    background: #fff;
+    color: #000;
+    font: inherit;
+    font-size: 0.8em;
+    line-height: 1.4;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.mac-button:active {
+    transform: translateY(1px);
+}
+
+.mac-button:focus-visible,
+.mac-close-btn:focus-visible {
+    outline: 1px dotted #000;
+    outline-offset: 1px;
+}
+
+/* Field subtitle row under the window title bar */
+.mac-subtitlebar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    border-bottom: 2px solid #000;
+    background-color: #fff;
+    color: #000;
+    min-height: 26px;
+    box-sizing: border-box;
+    transition: background-color 5s ease, border-color 5s ease, color 5s ease;
+}
+
+.mac-subtitlebar--no-center {
+    grid-template-columns: 1fr 1fr;
+}
+
+.mac-subtitle-value {
+    font-size: 0.75em;
+    font-weight: bold;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: inherit;
+    transition: color 5s ease;
+}
+
+.mac-subtitle-left {
+    text-align: left;
+}
+
+.mac-subtitle-right {
+    text-align: right;
+}
+
+.mac-subtitle-center {
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+.mac-subtitle-center-label {
+    font-size: 0.75em;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+    color: inherit;
+    transition: color 5s ease;
+}
+
+.field-subtitle-select {
+    max-width: 180px;
+    font-size: 0.75em;
+    line-height: 1.2;
+    padding: 1px 6px;
+    border: 1px solid currentColor;
+    background-color: inherit;
+    color: inherit;
+    transition: background-color 5s ease, border-color 5s ease, color 5s ease;
+}
+
+#field-subtitlebar {
+    transition: background-color 5s ease, border-color 5s ease, color 5s ease;
+}
+
+#field-subtitlebar .mac-subtitle-value,
+#field-subtitlebar .mac-subtitle-center-label,
+#field-subtitlebar .field-subtitle-select {
+    transition: background-color 5s ease, border-color 5s ease, color 5s ease;
+}
+
+@media (max-width: 520px) {
+    .mac-subtitlebar {
+        grid-template-columns: 1fr;
+        row-gap: 2px;
+    }
+
+    .mac-subtitle-left,
+    .mac-subtitle-right,
+    .mac-subtitle-center {
+        justify-content: center;
+        text-align: center;
+    }
+
+}
+
+/* Strip borders / margins from containers that are now inside a mac-window */
+.mac-window .resource-panel,
+.mac-window .resource-bar,
+.mac-window .toolbox-container,
+.mac-window .store-container,
+.mac-window .quests-container,
+.mac-window .upgrades-container {
+    border: none;
+    margin: 0;
+    max-width: none;
+    width: 100%;
+}
+
+.mac-window .field-container {
+    border: none;
+    margin: 0;
+}
+
+/* ── Mac Window — Dark Mode (OS preference) ─────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+    body:not(.light) .mac-window {
+        border-color: #fff;
+        background: #000;
+    }
+
+    body:not(.light) .mac-titlebar {
+        border-bottom-color: #fff;
+    }
+
+    body:not(.light) .mac-titlebar::before {
+        opacity: 1;
+    }
+
+    body:not(.light) .mac-title {
+        background: #000;
+        color: #fff;
+    }
+
+    body:not(.light) .mac-close-btn {
+        border-color: #fff;
+        background: #000;
+    }
+
+    body:not(.light) .mac-subtitlebar {
+        border-bottom-color: #fff;
+        background-color: #000;
+        color: #fff;
+    }
+
+    body:not(.light) .mac-notification-overlay,
+    body:not(.light) .mac-welcome-overlay {
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    body:not(.light) .keybinds-overlay {
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    body:not(.light) .station-detail-overlay {
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    body:not(.light) .desktop-window-launch-ghost {
+        border-color: #fff;
+    }
+
+    body:not(.light) .keybinds-section + .keybinds-section {
+        border-top-color: #555;
+    }
+
+    body:not(.light) .mac-button {
+        border-color: #fff;
+        background: #000;
+        color: #fff;
+    }
+
+    body:not(.light) .quest-requirements-table td {
+        border-color: #fff;
+    }
+
+    body:not(.light) .keybinds-input {
+        border-color: #fff;
+        background: #000;
+        color: #fff;
+    }
+
+    body:not(.light) .mac-button:focus-visible,
+    body:not(.light) .mac-close-btn:focus-visible {
+        outline-color: #fff;
+    }
+
+    body:not(.light) .keybinds-input:focus-visible {
+        outline-color: #fff;
+    }
+}
+
+/* ── Mac Window — Explicit Dark Mode (body.dark) ────────────────────────────── */
+
+body.dark .mac-window {
+    border-color: #fff;
+    background: #000;
+}
+
+body.dark .mac-titlebar {
+    border-bottom-color: #fff;
+}
+
+body.dark .mac-titlebar::before {
+    opacity: 1;
+}
+
+body.dark .mac-title {
+    background: #000;
+    color: #fff;
+}
+
+body.dark .mac-close-btn {
+    border-color: #fff;
+    background: #000;
+}
+
+body.dark .mac-subtitlebar {
+    border-bottom-color: #fff;
+    background-color: #000;
+    color: #fff;
+}
+
+body.dark #field-subtitlebar {
+    border-bottom-color: #fff;
+    background-color: #000;
+    color: #fff;
+}
+
+body.dark .mac-notification-overlay,
+body.dark .mac-welcome-overlay {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+body.dark .keybinds-overlay {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+body.dark .station-detail-overlay {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+body.dark .desktop-window-launch-ghost {
+    border-color: #fff;
+}
+
+body.dark .keybinds-section + .keybinds-section {
+    border-top-color: #555;
+}
+
+body.dark .mac-button {
+    border-color: #fff;
+    background: #000;
+    color: #fff;
+}
+
+body.dark .quest-requirements-table td {
+    border-color: #fff;
+}
+
+body.dark .keybinds-input {
+    border-color: #fff;
+    background: #000;
+    color: #fff;
+}
+
+body.dark .mac-button:focus-visible,
+body.dark .mac-close-btn:focus-visible {
+    outline-color: #fff;
+}
+
+body.dark .keybinds-input:focus-visible {
+    outline-color: #fff;
+}
+
+/* ── Mac Window — Explicit Light Mode (body.light) ──────────────────────────── */
+
+body.light .mac-window {
+    border-color: #000;
+    background: #fff;
+}
+
+body.light .mac-titlebar {
+    border-bottom-color: #000;
+}
+
+body.light .mac-titlebar::before {
+    opacity: 0;
+}
+
+body.light .mac-title {
+    background: #fff;
+    color: #000;
+}
+
+body.light .mac-close-btn {
+    border-color: #000;
+    background: #fff;
+}
+
+body.light .mac-subtitlebar {
+    border-bottom-color: #000;
+    background-color: #fff;
+    color: #000;
+}
+
+body.light #field-subtitlebar {
+    border-bottom-color: #000;
+    background-color: #fff;
+    color: #000;
+}
+
+body.light .mac-notification-overlay {
+    background: rgba(255, 255, 255, 0.65);
+}
+
+body.light .mac-button {
+    border-color: #000;
+    background: #fff;
+    color: #000;
+}
+
+/* ── Node Overview (Zoom 1) ───────────────────────────────────────────────── */
+
+#node-overview-shell {
+    font-family: monospace;
+    color: #8fff8f;
+    background: #040d04;
+}
+
+.node-ov-layout {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+.node-ov-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-bottom: 1px solid #1a4d1a;
+    background: #060e06;
+    flex-shrink: 0;
+}
+
+.node-ov-node-label {
+    font-size: 1.1em;
+    letter-spacing: 0.05em;
+    color: #a0ffa0;
+}
+
+.node-ov-body {
+    display: flex;
+    flex: 1 1 0;
+    overflow: hidden;
+    gap: 0;
+}
+
+.node-ov-stats {
+    width: 220px;
+    flex-shrink: 0;
+    padding: 14px 16px;
+    border-right: 1px solid #1a4d1a;
+    overflow-y: auto;
+    background: #050a05;
+}
+
+.node-ov-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.node-ov-table th,
+.node-ov-table td {
+    padding: 2px 6px 2px 0;
+    text-align: left;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.node-ov-table th {
+    color: #5acc5a;
+    font-weight: normal;
+    padding-right: 12px;
+}
+
+.node-ov-table td {
+    color: #a0ffa0;
+}
+
+.node-ov-table.autofarmer-detail-table th {
+    text-align: right;
+}
+
+.node-ov-field {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px;
+    overflow: auto;
+    background: #050a05;
+}
+
+.node-ov-field-title {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #5acc5a;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+.node-ov-field-grid {
+    display: grid;
+    gap: 2px;
+    width: max-content;
+}
+
+.node-ov-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 0.85em;
+    line-height: 1;
+}
+
+.node-ov-cell--empty {
+    color: #1a3d1a;
+    cursor: default;
+}
+
+.node-ov-cell--crop {
+    color: #8fff8f;
+    cursor: default;
+    border: 1px solid #1a4d1a;
+    background: #060e06;
+}
+
+.node-ov-cell--crop-btn {
+    color: #8fff8f;
+    cursor: pointer;
+    border: 1px solid #1a4d1a;
+    background: #060e06;
+    padding: 0;
+}
+
+.node-ov-cell--crop-btn:hover {
+    border-color: #5acc5a;
+    background: #0a1a0a;
+    color: #afffaf;
+}
+
+.node-ov-cell--module {
+    color: #5acc5a;
+    border: 1px solid #2a7a2a;
+    background: #0a180a;
+    cursor: pointer;
+}
+
+.node-ov-cell--module:hover {
+    background: #0f280f;
+    border-color: #5acc5a;
+}
+
+/* ── Node Overview autofarmer pulse states ─────────────────────────────────── */
+@keyframes af-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+}
+
+@keyframes af-pulse-stalled {
+    0%, 100% { opacity: 1; border-color: #cc4444; color: #ff6666; }
+    50%       { opacity: 0.5; border-color: #882222; color: #cc4444; }
+}
+
+.node-ov-cell--module.af-slot--active {
+    animation: af-pulse 1.8s ease-in-out infinite;
+}
+
+.node-ov-cell--module.af-slot--stalled {
+    animation: af-pulse-stalled 1.2s ease-in-out infinite;
+    color: #ff6666;
+    border-color: #cc4444;
+}
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+.node-ov-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-top: 1px solid #1a4d1a;
+    background: #060e06;
+    flex-shrink: 0;
+    gap: 12px;
+}
+
+.node-ov-btn {
+    padding: 5px 14px;
+    background: #0a180a;
+    color: #8fff8f;
+    border: 1px solid #2a7a2a;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 0.9em;
+    letter-spacing: 0.03em;
+}
+
+.node-ov-btn:hover {
+    background: #0f280f;
+    border-color: #5acc5a;
+    color: #a0ffa0;
+}
+
+.node-ov-btn--primary {
+    border-color: #5acc5a;
+    color: #a0ffa0;
+}
+
+.node-ov-btn--primary:hover {
+    background: #133013;
+    border-color: #8fff8f;
+}
+
+/* ── Netspace notification theme variant ─────────────────────────────────────
+   Applied by adding --theme-netspace to .mac-notification-overlay when the
+   active scene is nodeOverview or worldMap. Placed at end of stylesheet so
+   it wins over dark/light mode media query rules at equal specificity.
+   Wired via setNotificationTheme() in macNotifications.js,
+   called from sceneTransitions.js (Step 12b).
+   ─────────────────────────────────────────────────────────────────────────── */
+.mac-notification-overlay--theme-netspace {
+    background: rgba(0, 10, 0, 0.82);
+}
+
+.mac-notification-overlay--theme-netspace .mac-window {
+    background: #040d04;
+    border-color: #5acc5a;
+    color: #8fff8f;
+    box-shadow: 0 0 20px rgba(90, 204, 90, 0.30);
+}
+
+.mac-notification-overlay--theme-netspace .mac-titlebar {
+    background: #060e06;
+    border-bottom-color: #1a4d1a;
+    transition: none;
+}
+
+.mac-notification-overlay--theme-netspace .mac-titlebar::before {
+    opacity: 0;
+    transition: none;
+}
+
+.mac-notification-overlay--theme-netspace .mac-title {
+    color: #8fff8f;
+    background: #060e06;
+    border-color: #1a4d1a;
+    transition: none;
+}
+
+.mac-notification-overlay--theme-netspace .mac-close-btn {
+    background: #040d04;
+    border-color: #5acc5a;
+    color: #5acc5a;
+    transition: none;
+}
+
+.mac-notification-overlay--theme-netspace .mac-close-btn:hover {
+    background: #0a1a0a;
+    box-shadow: 0 0 6px rgba(90, 204, 90, 0.50);
+}
+
+.mac-notification-overlay--theme-netspace .mac-dialog-content {
+    color: #8fff8f;
+}
+
+.mac-notification-overlay--theme-netspace .mac-dialog-message {
+    color: #8fff8f;
+}
+
+.mac-notification-overlay--theme-netspace .mac-button {
+    background: #040d04;
+    border-color: #5acc5a;
+    color: #8fff8f;
+    transition: none;
+}
+
+.mac-notification-overlay--theme-netspace .mac-button:hover {
+    background: #0a1a0a;
+    border-color: #a0ffa0;
+    color: #a0ffa0;
+}
+
+.mac-notification-overlay--theme-netspace .mac-button:focus-visible,
+.mac-notification-overlay--theme-netspace .mac-close-btn:focus-visible {
+    outline: 1px dotted #5acc5a;
+    outline-offset: 1px;
+}
+
+.autofarmer-detail-overlay.mac-notification-overlay--theme-netspace .mac-window {
+    background: #040d04;
+    border-color: #5acc5a;
+    color: #8fff8f;
+    box-shadow: 0 0 20px rgba(90, 204, 90, 0.30);
+}
+
+.autofarmer-detail-overlay.mac-notification-overlay--theme-netspace .mac-titlebar {
+    background: #060e06;
+    border-bottom-color: #1a4d1a;
+}
+
+.autofarmer-detail-overlay.mac-notification-overlay--theme-netspace .mac-title {
+    color: #8fff8f;
+    background: #060e06;
+    border-color: #1a4d1a;
+}
+
+.autofarmer-detail-overlay.mac-notification-overlay--theme-netspace .node-ov-table th {
+    color: #5acc5a;
+}
+
+.autofarmer-detail-overlay.mac-notification-overlay--theme-netspace .node-ov-table td {
+    color: #a0ffa0;
+}
