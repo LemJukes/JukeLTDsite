@@ -1091,7 +1091,7 @@ function showStartScreen() {
 
         <p class="overlay-heading">⚠ ON THE SUBJECT OF FAILURE</p>
         <p>Should the timer reach zero:</p>
-        <p>Do not allow the timre to reach zero.</p>
+        <p>Do not allow the timer to reach zero.</p>
         <p>We, The Organization©™¶®™®, are not obligated to disclose any potential hazards to
            your person. Therefore it is an employees sole responsibilty to maintain and persist
            the primary function of their position.</p>
