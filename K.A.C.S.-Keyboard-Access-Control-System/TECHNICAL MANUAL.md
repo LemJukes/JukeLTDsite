@@ -268,13 +268,21 @@ Each run begins with only Ring 0 unlocked (`initKeyBindings()` populates `state.
 
 Once the Expansion Gate (§5.2) is open, each Break Room unlocks a chunk of the next ring sized at
 `EXPANSION_RATE = 0.30` of that ring (rounded up, minimum one key). When a ring is exhausted the
-System advances to the next. Sequences are drawn only from commands bound to currently-unlocked
-keys (`generateSequence()`).
+System advances to the next. Ordinary sequences are drawn only from commands bound to
+currently-unlocked, non-numpad keys (`generateSequence()` excludes `NUMPAD_KEYS` from the normal
+pool) — Ring 5 never mixes into regular play.
 
 ### 6.3 The Numpad Bonus Tier
 
 Ring 5 is the numpad. Its appearance is a milestone reserved for unusually compliant Employees
-and triggers a dedicated onboarding tip (§11).
+and triggers a dedicated onboarding tip (§11). Once at least one numpad key has unlocked,
+`completeSequence()` watches `state.cleanSequenceStreak`: every `CLEAN_STREAK_FOR_NUMPAD_BONUS = 6`
+consecutive clean sequences (and never two bonus rounds back to back) sets `state.bonusSequence`,
+which queues a dedicated bonus round for the *next* sequence — `nextSequence()` then doubles the
+length (`state.sequenceLength × 2`) and calls `generateSequence(length, { numpadOnly: true })`, so
+the round is drawn exclusively from whichever numpad keys are currently unlocked. The flag clears
+the moment that bonus round is itself completed, returning play to the normal (numpad-free) pool
+until the streak earns another one.
 
 ---
 
@@ -390,7 +398,8 @@ their optional `apply()`; cosmetics recolour the CRT immediately.
 
 ## 10. CONSUMABLES AND INVENTORY
 
-Owned consumables appear in the inventory bar during play, each assigned a hotkey by position.
+Owned consumables claim a slot in the key-bindings panel's reserved number row during play, each
+assigned a hotkey by position and showing its name and remaining charge count.
 The Employee activates a consumable with the matching **main number-row** key (`1`–`9`) or by
 clicking its slot (`useConsumable()` / `useConsumableSlot()`). Each item's `use()` returns
 `false` if it cannot apply at that instant (e.g. TIME FREEZE while already frozen), in which case
@@ -476,14 +485,17 @@ unattainable, and instructive.
 A single module-level `state` object holds all mutable runtime data: the current phase,
 key bindings (keyed by `event.code`), the active sequence and position, score, timer fields,
 progression and clean-play counters, the credit/inventory/upgrade ledger, keyboard-expansion
-bookkeeping (`activeKeys`, `hiddenKeys`, ring cursors), and tutorial queue state. The phase is
-one of `START | PLAYING | BREAK_ROOM | GAME_OVER` and gates nearly all behaviour.
+bookkeeping (`activeKeys`, `hiddenKeys`, ring cursors), the cumulative-clean-set counter that
+drives the Containment Breach (§15), and tutorial queue state. The phase is one of
+`START | PLAYING | BREAK_ROOM | GAME_OVER` (with a transient, inert `ASCENDING` held during the
+shatter set-piece) and gates nearly all behaviour.
 
 ### 14.2 The Render Pipeline
 
 Rendering is direct DOM manipulation, no framework. `renderAll()` composes the focused
-renderers: `renderSequenceDisplay()`, `renderKeyBindings()`, `renderInventory()`,
-`updateTimerDisplay()`, and `updateScoreDisplay()`. Renderers are idempotent and safe to call
+renderers: `renderSequenceDisplay()`, `renderKeyBindings()` (which also draws the reserved
+number-row's consumable bindings and charge counts), `updateTimerDisplay()`, and
+`updateScoreDisplay()`. Renderers are idempotent and safe to call
 repeatedly; the input handler re-renders only the panels affected by each keystroke.
 
 ### 14.3 Event Routing
@@ -500,6 +512,62 @@ binding grid behind the start overlay for atmosphere.
 All balance values are named constants at the top of `game.js` (Appendix B). The System is
 re-balanced by editing numbers, not logic — a design the Organization describes as "maintainable"
 and the Employee may describe however they wish, silently.
+
+---
+
+## 15. THE TERMINAL COMPLIANCE EVENT ("THE CONTAINMENT BREACH")
+
+### 15.1 The Premise the Manual Has Been Withholding
+
+The Employee was retained to operate the Apparatus. The Employee was permitted to believe the
+operation *contained* the Machine. It did not. Each completed sequence — clean or not — is a
+feeding. The Organization regards this clarification as immaterial, since the Employee's duties
+are unchanged by it.
+
+### 15.2 The Fracture Schedule
+
+A cycle accumulates `state.cycleSequenceTotal` — every sequence completed this cycle, evaluated
+in `completeSequence()` alongside the existing score bookkeeping. The count is **cumulative and
+never regresses**: it advances on every completed sequence regardless of deviation. The display's
+fracture stage is `crackStageForSequences()`, advancing as the count passes each
+`CRACK_STAGE_SEQUENCES` threshold (`[101, 105, 109, 113, 117, 121]`). Each newly reached stage:
+
+- widens and brightens the cracks rendered by `renderCracks()` over the `#crack-overlay`
+  (an SVG lattice, screen-blended above the timer-glitch overlay but beneath the scanlines), and
+- writes one escalating `MSGS.crackOmen` line to the MACHINE STATUS feed, the corporate register
+  eroding stage by stage into something closer to confession.
+
+From the mid stages a light begins to seep from *behind* the glass (the `.crack-light` bloom),
+which the Organization stresses is not emitted by the display.
+
+### 15.3 The Shatter
+
+When `cycleSequenceTotal` reaches `ASCENSION_SHATTER_SEQUENCES = 127`, `completeSequence()` does
+not hand off to the next sequence or break room. It calls `triggerAscension()` instead. The light
+floods every crack, the interface dies to dark (reusing the §13.2 `.dying` throes),
+`MSGS.ascensionLog` streams its realisation into the still-lit log, and the screen whites out. A
+held splash (`#ascension-splash`, white settling to a black void) presents `MSGS.ascensionEnd` and
+waits — as the GAME OVER splash does (§13.3) — for the Employee to acknowledge what they have
+done. The high score is banked at this instant regardless of what follows.
+
+### 15.4 The Cycle
+
+Acknowledgement invokes `rebirthRun()`. This is **not** a death and **not** a redemption (§13.5):
+it resumes the *same lineage* in fresh starting conditions. **Score and compliance credits
+persist.** Everything else — upgrades, inventory, keybindings, keyboard expansion, the clean-play
+gates, efficiency, cosmetics, and the cracks themselves — resets to a new run (shared with
+`startGame()` via `resetRunState()`). `state.ascensionCount` increments. The countdown is restored
+to full and the first sequence of the new cycle loads. All is one. The cycle collapses and
+repeats, and the Employee's accumulated tally is the only thing carried across the threshold,
+which the Organization offers neither as reward nor as mercy.
+
+### 15.5 Persistence
+
+`cycleSequenceTotal` and `ascensionCount` are written into the run checkpoint (§13's `SAVE_VERSION`
+is bumped accordingly), so the fracture stage is restored exactly on reload from a break room.
+The shatter clears the checkpoint, consistent with §13.1: there is no refresh-to-revive, and a
+reload during the shatter or the first reborn set returns the Employee to the start screen with
+only the (already banked) high score — the carried tally of an interrupted cycle is forfeit.
 
 ---
 
@@ -547,6 +615,8 @@ ACKNOWLEDGE
 | `REDEMPTION_UNLOCK_SCORE`     | 25    | Sequences before ATTEMPT REDEMPTION appears (§13.5)  |
 | `REDEMPTION_BASE_COST`        | 100   | Credit cost of the first revive in a run (§13.5)     |
 | `REDEMPTION_COST_MULTIPLIER`  | 2     | Per-use cost doubling for redemption (§13.5)         |
+| `CRACK_STAGE_SEQUENCES`       | 101–121 | Sequence-completed thresholds per crack stage (§15.2) |
+| `ASCENSION_SHATTER_SEQUENCES` | 127   | Cumulative sequences this cycle that trigger the shatter (§15.3) |
 | `MAX_LOG_ENTRIES`             | 50    | Machine-status log retention                          |
 | `MAX_DISPLAY_CMD_LENGTH`      | 9     | Command-name truncation in key cells                  |
 

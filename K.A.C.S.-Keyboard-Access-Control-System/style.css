@@ -53,19 +53,16 @@ html, body {
 }
 
 /* ── Game Container — CSS Grid ─────────────────────────────── */
-/* Centered, focused column during play; widens into two columns
-   (rebind keys + shop) in the break room to use the full screen. */
+/* Header and input bar stay pinned; everything else lives in a single
+   scrollable column (#content-scroll) so panels never have to be squeezed
+   to fit — they just stack and the window scrolls. */
 #game-container {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: auto auto auto 1fr auto auto auto;
+  grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "header"
-    "sequence"
-    "middle"
-    "bindings"
-    "breakroom"
-    "inventory"
+    "content"
     "input";
   width: 100%;
   max-width: 1080px;
@@ -79,25 +76,30 @@ html, body {
 
 /* Map panels to named grid areas */
 #header         { grid-area: header; }
-#sequence-panel { grid-area: sequence; }
-#middle-row     { grid-area: middle; }
-#bindings-panel { grid-area: bindings; }
-#break-room     { grid-area: breakroom; }
-#inventory-bar  { grid-area: inventory; }
+#content-scroll { grid-area: content; }
 #input-panel    { grid-area: input; }
 
-/* Break room: widen out and sit the rebind keys beside REQUISITION */
+/* The single scrollable column holding sequence / timer+log / bindings /
+   break-room / inventory, in document order. */
+#content-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--green-dark) transparent;
+}
+
+#content-scroll::-webkit-scrollbar { width: 4px; }
+#content-scroll::-webkit-scrollbar-track { background: transparent; }
+#content-scroll::-webkit-scrollbar-thumb { background: var(--green-dark); }
+
+/* Break room: a little extra width since bindings + REQUISITION now both
+   run full-width, stacked, instead of side by side. */
 #game-container.in-break {
-  max-width: 1500px;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto minmax(60px, 16vh) 1fr auto auto;
-  grid-template-areas:
-    "header    header"
-    "sequence  sequence"
-    "middle    middle"
-    "bindings  breakroom"
-    "inventory inventory"
-    "input     input";
+  max-width: 1200px;
 }
 
 /* ── Panel label ───────────────────────────────────────────── */
@@ -425,6 +427,20 @@ html, body {
   box-shadow: 0 0 8px var(--green-glow);
 }
 
+/* Brief pulse on the exact key cell that was just pressed correctly, layered
+   on top of whatever steady state (highlight/precog/etc.) the cell is in. */
+.key-cell.correct-flash {
+  animation: key-correct-pulse 0.3s ease;
+}
+
+@keyframes key-correct-pulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.14);
+         border-color: #ffffff;
+         box-shadow: 0 0 16px var(--green), 0 0 28px var(--green-glow); }
+  100% { transform: scale(1); }
+}
+
 /* PRECOGNITION — dim preview of the next command's key */
 .key-cell.precog {
   border-color: var(--green-dim);
@@ -448,6 +464,13 @@ html, body {
 .key-cell.rebindable:hover {
   border-color: var(--cyan);
   cursor: pointer;
+}
+
+/* Mouse-click key entry during PLAYING — clicking presses the key (for a fee). */
+.key-cell.clickable { cursor: pointer; }
+.key-cell.clickable:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
 }
 
 /* Frequency heat in rebinding mode */
@@ -487,7 +510,9 @@ html, body {
 .key-cell.locked .key-label { color: var(--text-dim); text-shadow: none; }
 .key-cell.locked .key-cmd   { color: var(--text-dim); }
 
-/* Reserved main number row — triggers consumables 1–9, never bindable. */
+/* Reserved main number row — triggers consumables 1–9, never bindable.
+   Empty slots stay dim/inert; slots holding an owned consumable ("usable")
+   light up and show the item name + remaining charges. */
 .key-cell.reserved {
   opacity: 0.55;
   border-color: var(--green-dark);
@@ -497,8 +522,26 @@ html, body {
 .key-cell.reserved .key-label { color: var(--green-dim); text-shadow: none; }
 .key-cell.reserved .key-cmd   { color: var(--text-dim); font-size: 7px; letter-spacing: 0.1em; }
 
+.key-cell.reserved.usable {
+  opacity: 1;
+  border-color: var(--green-dim);
+  cursor: pointer;
+}
+.key-cell.reserved.usable .key-label { color: var(--green); text-shadow: 0 0 6px var(--green-glow); }
+.key-cell.reserved.usable .key-cmd   { color: var(--green-dim); font-size: 8px; letter-spacing: 0.04em; }
+.key-cell.reserved.usable:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
+}
+
+.key-cell.reserved .key-count {
+  font-size: 8px;
+  color: var(--amber);
+  margin-top: 1px;
+}
+
 .key-row.reserved-row { margin-bottom: 3px; }
-.key-row.reserved-row .key-cell { min-width: 38px; padding: 1px 3px; }
+.key-row.reserved-row .key-cell { min-width: 58px; padding: 3px 4px; }
 
 /* Numpad bonus cluster (appears only once it begins unlocking). */
 .numpad-label {
@@ -582,14 +625,13 @@ html, body {
 }
 
 /* ── BREAK ROOM / REQUISITION SHOP ─────────────────────────── */
+/* Sizes to its own content — #content-scroll owns the scrolling now, so this
+   panel doesn't need its own inner scroll region. */
 #break-room {
   padding: 8px 10px;
   border: 1px solid var(--cyan);
   background: var(--bg-panel);
   box-shadow: inset 0 0 24px rgba(0, 229, 255, 0.05);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
 }
 
 #break-room .panel-label {
@@ -606,16 +648,7 @@ html, body {
   flex-direction: column;
   gap: 10px;
   margin-top: 4px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--green-dark) transparent;
 }
-
-#shop-grid::-webkit-scrollbar { width: 4px; }
-#shop-grid::-webkit-scrollbar-track { background: transparent; }
-#shop-grid::-webkit-scrollbar-thumb { background: var(--green-dark); }
 
 /* Drip-feed status line at the top of REQUISITION. */
 .shop-drip-note {
@@ -711,64 +744,6 @@ html, body {
   color: var(--cyan);
   letter-spacing: 0.1em;
   text-align: right;
-}
-
-/* ── INVENTORY BAR (consumables in play) ───────────────────── */
-#inventory-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-panel);
-  min-height: 30px;
-}
-
-.inv-empty {
-  font-size: 10px;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-}
-
-.inv-slot {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: #020b04;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  user-select: none;
-}
-
-.inv-slot:hover {
-  border-color: var(--cyan);
-  box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
-}
-
-.inv-key {
-  font-size: 12px;
-  font-weight: bold;
-  color: var(--green);
-  text-shadow: 0 0 6px var(--green-glow);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  padding: 0 5px;
-}
-
-.inv-name {
-  font-size: 11px;
-  color: var(--green-dim);
-  letter-spacing: 0.05em;
-}
-
-.inv-count {
-  font-size: 11px;
-  color: var(--amber);
 }
 
 /* ── INPUT ECHO ────────────────────────────────────────────── */
@@ -1061,15 +1036,17 @@ html, body {
   100% { color: var(--green); text-shadow: 0 0 8px var(--green-glow); }
 }
 
-/* Shake effect on error */
+/* Shake effect — magnitude driven by --shake-mag (set in JS). Used both for the fixed
+   error jolt and the Containment Breach's per-keystroke shake, which grows with the
+   crack stage (see shakeContainer() / crackShakeMagnitude() in game.js). */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  15%       { transform: translateX(-6px); }
-  30%       { transform: translateX(6px); }
-  45%       { transform: translateX(-4px); }
-  60%       { transform: translateX(4px); }
-  75%       { transform: translateX(-2px); }
-  90%       { transform: translateX(2px); }
+  15%       { transform: translateX(calc(-1    * var(--shake-mag, 6px))); }
+  30%       { transform: translateX(calc(1     * var(--shake-mag, 6px))); }
+  45%       { transform: translateX(calc(-0.67 * var(--shake-mag, 6px))); }
+  60%       { transform: translateX(calc(0.67  * var(--shake-mag, 6px))); }
+  75%       { transform: translateX(calc(-0.33 * var(--shake-mag, 6px))); }
+  90%       { transform: translateX(calc(0.33  * var(--shake-mag, 6px))); }
 }
 
 .shake {
@@ -1177,6 +1154,114 @@ html, body {
   100% { background-position: 0 -20px, 0 50px; opacity: 0.9; }
 }
 
+/* ── THE CONTAINMENT BREACH (cracks → shatter) ──────────────── */
+/* A progression-driven corruption, separate from the timer glitch: the display
+   fractures as clean SETS accrue, starting at 1-2 screen corners (state.crackCorners)
+   and growing toward centre. Sits above #glitch-overlay (z-90) but below the scanlines
+   (z-100) so the CRT grain still rides over the cracks. --crack-stage (0..6, set by
+   renderCracks) drives growth/width.
+   Each crack line is two stacked paths: .crack-glow (bright, blurred, screen-blended —
+   the light leaking from the edges) and .crack-void (a near-black core, normally
+   blended) painted on top of it. isolation:isolate scopes those blend modes to this
+   overlay so the void path can actually read as dark instead of being washed out by a
+   screen blend on the whole layer. Stages 1-3 grow the hairline (void stays at 0 width,
+   so only the thin glow line shows); stages 4-6 add no new geometry but widen the void
+   into the glow, so the same lines read as glass falling away into darkness with a
+   brightening glowing rim. */
+#crack-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 92;
+  pointer-events: none;
+  isolation: isolate;
+  --crack-stage: 0;
+}
+
+#crack-overlay svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The vast dark behind the glass — kept almost invisible until the very end, then the
+   burst floods it to white. The breathing blur only animates while .crack-breathing is
+   set (late stages / the shatter) so it isn't burning frames for most of a run. */
+.crack-light {
+  transform-box: fill-box;
+  transform-origin: center;
+  mix-blend-mode: screen;
+  opacity: calc(max(var(--crack-stage) - 4, 0) * 0.04);
+  transition: opacity 0.8s ease;
+}
+
+#crack-overlay.crack-breathing .crack-light {
+  animation: crack-breathe 3.6s ease-in-out infinite;
+}
+
+@keyframes crack-breathe {
+  0%, 100% { filter: blur(2px); }
+  50%      { filter: blur(5px); }
+}
+
+/* Crack strokes: hidden groups are transparent; .lit groups (set in renderCracks)
+   draw. The non-scaling stroke keeps crisp px line-widths despite the stretched
+   viewBox. */
+.crack-grp     { opacity: 0; transition: opacity 0.6s ease; }
+.crack-grp.lit { opacity: 1; }
+
+.crack-grp path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The glow: a thin bright hairline at low stages, growing wider and more luminous once
+   the widening stages (4-6) kick in — the edges "brighten and glow" as the glass opens. */
+.crack-grp path.crack-glow {
+  mix-blend-mode: screen;
+  stroke: rgba(224, 252, 255, 0.9);
+  stroke-width: calc(0.9px + max(var(--crack-stage) - 3, 0) * 2.1px);
+  filter: drop-shadow(0 0 calc(1px + max(var(--crack-stage) - 3, 0) * 1.4px) var(--cyan));
+}
+
+/* The void: invisible at stages 1-3 (hairline-only growth), then widens on top of the
+   glow stroke — always narrower than it, so a glowing rim of the glow stroke remains
+   visible at its edges. Painted with a normal blend so it actually darkens the screen. */
+.crack-grp path.crack-void {
+  stroke: #03080a;
+  opacity: 0.94;
+  stroke-width: calc(max(var(--crack-stage) - 3, 0) * 1.3px);
+}
+
+/* The shatter: every crack (glow and void alike) snaps to white and the light floods
+   the whole screen (the white-out). Added in triggerAscension; cleared by clearCracks. */
+#crack-overlay.crack-burst .crack-grp { opacity: 1; }
+
+#crack-overlay.crack-burst .crack-grp path {
+  stroke: #ffffff;
+  opacity: 1;
+  animation: crack-burst-paths 1.4s ease-in forwards;
+}
+
+#crack-overlay.crack-burst .crack-light {
+  animation: crack-burst-light 1.4s ease-in forwards;
+}
+
+@keyframes crack-burst-paths {
+  0%   { stroke-width: 2.6px;
+         filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 16px var(--cyan)); }
+  70%  { stroke-width: 7px; }
+  100% { stroke-width: 0;   }   /* consumed by the light */
+}
+
+@keyframes crack-burst-light {
+  0%   { opacity: 0.4; filter: blur(4px); transform: scale(1); }
+  60%  { opacity: 1;   filter: blur(8px); transform: scale(1.5); }
+  100% { opacity: 1;   filter: blur(0);   transform: scale(3.2); }
+}
+
 /* ── DEATH THROES (.dying — added the instant the timer hits zero) ── */
 /* Motion is reduced here: the violent tearing stops and instead every panel
    EXCEPT the machine-status log flickers and glitches to darkness, leaving the
@@ -1186,7 +1271,6 @@ html, body {
 .dying #timer-panel,
 .dying #bindings-panel,
 .dying #break-room,
-.dying #inventory-bar,
 .dying #input-panel {
   animation: flicker-to-dark 1.6s steps(2, end) forwards;
 }
@@ -1286,6 +1370,172 @@ html, body {
   animation: blink 1.4s step-end infinite;
 }
 
+/* ── HELD ASCENSION SPLASH (the shatter's aftermath) ─────────── */
+/* Counterpart to the GAME OVER splash: after the display bursts, the screen settles
+   to a white, broken backdrop (the same crack lines, now still and dark against the
+   light) holding the cosmic sign-off, until the player clicks/keys to reignite the
+   cycle (rebirthRun). The sign-off itself is written in black crayon, one phrase at a
+   time, like a child writing slowly (see playCrayonLines in game.js). */
+#ascension-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  cursor: pointer;
+  background: #f5f3ec;
+  animation: ascension-settle 2.2s ease both;
+}
+
+@keyframes ascension-settle {
+  0%   { background: #ffffff; }
+  100% { background: #f5f3ec; }
+}
+
+/* The same fracture geometry as #crack-overlay (built via buildCrackSvg), redrawn
+   still and dark instead of glowing — the glass that just broke, now lying behind
+   the writing. */
+.ascension-cracked-glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ascension-cracked-glass svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ascension-cracked-glass .crack-light { display: none; }
+
+.ascension-cracked-glass .crack-grp { opacity: 1; }
+
+.ascension-cracked-glass .crack-grp path.crack-glow {
+  stroke: rgba(20, 20, 20, 0.10);
+  stroke-width: 3px;
+  filter: none;
+}
+
+.ascension-cracked-glass .crack-grp path.crack-void {
+  stroke: rgba(15, 15, 15, 0.5);
+  stroke-width: 1.6px;
+  opacity: 1;
+}
+
+.ascension-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  min-height: clamp(40px, 10vw, 90px);
+}
+
+/* One phrase, written letter by letter, then faded for the next (see playCrayonLines). */
+.crayon-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  transition: opacity 0.9s ease;
+}
+
+.crayon-line.crayon-fade-out {
+  opacity: 0;
+}
+
+.crayon-letter {
+  display: inline-block;
+  white-space: pre;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+  font-size: clamp(26px, 6.5vw, 58px);
+  color: #1a1a1a;
+  transform: rotate(var(--wobble, 0deg));
+  text-shadow:
+    0.6px 0.4px 0 rgba(0, 0, 0, 0.3),
+    -0.4px 0.2px 0 rgba(0, 0, 0, 0.18);
+  animation: crayon-stroke 0.3s ease-out both;
+}
+
+@keyframes crayon-stroke {
+  0%   { opacity: 0; transform: rotate(var(--wobble, 0deg)) scale(0.5) translateY(8px); }
+  60%  { opacity: 1; transform: rotate(var(--wobble, 0deg)) scale(1.1) translateY(-2px); }
+  100% { opacity: 1; transform: rotate(var(--wobble, 0deg)) scale(1) translateY(0); }
+}
+
+/* Appended 2s after the last sign-off line fades away (see playCrayonLines' onDone in
+   game.js) — fades up over 1s, then settles into its blink. */
+.ascension-hint {
+  font-family: var(--font);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: rgba(0, 0, 0, 0.4);
+  text-transform: uppercase;
+  opacity: 0;
+  animation: ascension-hint-in 1s ease forwards, blink 1.4s step-end infinite 1s;
+}
+
+@keyframes ascension-hint-in {
+  to { opacity: 1; }
+}
+
+/* ── HELD RETURNING EMPLOYEE SPLASH ─────────────────────────── */
+/* Shown once on resume from a saved break-room checkpoint (a fresh page load
+   or a mid-run refresh) so the player understands why they've landed back in
+   the break room instead of wherever the timer caught them. Calmer/cyan,
+   distinct from the red GAME OVER splash and the white→void ASCENSION one. */
+#returning-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 122;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.88);
+  cursor: pointer;
+}
+
+.returning-modal {
+  border: 2px solid var(--cyan);
+  background: var(--bg-panel);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.4), inset 0 0 30px rgba(0, 229, 255, 0.05);
+  padding: 28px 32px;
+  max-width: 440px;
+  width: 90%;
+  text-align: center;
+}
+
+.returning-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+  margin-bottom: 12px;
+}
+
+.returning-body {
+  font-size: 12px;
+  color: var(--green-dim);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.returning-hint {
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  animation: blink 1.4s step-end infinite;
+}
+
 /* Utility */
 .hidden {
   display: none !important;
@@ -1359,24 +1609,19 @@ html, body {
 /* ── Responsive adjustment ─────────────────────────────────── */
 @media (max-height: 650px) {
   #timer-number { font-size: 32px; }
-  #bindings-panel { display: none; }
 }
 
-/* On narrow screens, stack the break room back into one column */
-@media (max-width: 820px) {
-  #game-container.in-break {
-    max-width: 1080px;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto minmax(60px, 14vh) auto 1fr auto auto;
-    grid-template-areas:
-      "header"
-      "sequence"
-      "middle"
-      "bindings"
-      "breakroom"
-      "inventory"
-      "input";
-  }
+/* Reduced motion: drop the breach's heavy animations. The cracks still appear and
+   the shatter still resolves to the splash + black void — just without the breathing
+   bloom, the flood, or the white-out crossfade (matching the intro's courtesy). */
+@media (prefers-reduced-motion: reduce) {
+  .crack-light,
+  #crack-overlay.crack-burst .crack-light,
+  #crack-overlay.crack-burst .crack-grp path { animation: none; }
+  .crack-grp, .crack-light { transition: none; }
+  #ascension-splash { animation: none; background: #f5f3ec; }
+  .crayon-letter { animation: none; opacity: 1; transform: none; }
+  .crayon-line { transition: none; }
 }
 
 /* ── RESET-SAVE CONTROL (header) ───────────────────────────── */

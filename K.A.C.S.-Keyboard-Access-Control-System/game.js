@@ -69,6 +69,9 @@ const KEY_RINGS = [
 const ALL_KEYS    = KEY_RINGS.flat();
 const BINDABLE_SET = new Set(ALL_KEYS);
 
+/** The numpad ring (ring 5) — excluded from normal sequences; reserved for bonus rounds. */
+const NUMPAD_KEYS = new Set(KEY_RINGS[KEY_RINGS.length - 1]);
+
 /**
  * Physical layout for the binding grid. The main keyboard is always drawn
  * (locked keys dimmed) so the player can watch the pool grow outward; the
@@ -121,7 +124,7 @@ const BREAK_ROOM_EVERY = 5;
 /** localStorage key holding the serialized run checkpoint. */
 const SAVE_KEY     = 'kacs_save';
 /** Bumped whenever the snapshot shape changes, so stale saves are ignored. */
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 // ── Redemption (paid in-place revive on game over; resets each run) ──
 /** Sequences the run must reach before ATTEMPT REDEMPTION appears on the recap. */
@@ -135,9 +138,11 @@ const REDEMPTION_COST_MULTIPLIER = 2;
 /** Consecutive clean sets required before the keyboard / sequence-length ramp begins. */
 const CLEAN_SETS_FOR_EXPANSION  = 3;
 /** Cumulative clean sequences required before REQUISITION comes online. */
-const CLEAN_SEQ_FOR_REQUISITION = 25;
+const CLEAN_SEQ_FOR_REQUISITION = 20;
 /** Once REQUISITION is open, one more shop item is authorised per this-many clean sequences. */
-const ITEM_DRIP_EVERY           = 9;
+const ITEM_DRIP_EVERY           = 7;
+/** Consecutive clean sequences that queue a numpad-only bonus round (once the numpad is unlocked). */
+const CLEAN_STREAK_FOR_NUMPAD_BONUS = 6;
 
 // ── Economy tuning ────────────────────────────────────────────
 // Deliberately lean early: a clean length-3 set earns ~10-12 credits, so it
@@ -148,6 +153,7 @@ const CREDIT_BASE             = 0.5; // per command in the sequence
 const CREDIT_EFFICIENCY_BONUS = 1;   // scaled by lifetime efficiency ratio
 const CREDIT_TIME_DIVISOR     = 25;  // timeBonus = floor(timer / divisor)
 const HAZARD_PAY_MULTIPLIER   = 1.5; // credit multiplier when HAZARD PAY owned
+const CLICK_FEE_PER_KEY       = 0.2; // credits charged per mouse-clicked key during a sequence
 
 /** Per-level effects for permanent upgrades. */
 const OVERCLOCK_SECONDS = 20;        // added to each set's starting timer per level
@@ -156,6 +162,15 @@ const STIMULANT_SECONDS = 20;        // added to current timer per STIMULANT
 // ── Keyboard expansion tuning ─────────────────────────────────
 const EXPANSION_RATE             = 0.30; // fraction of the next ring unlocked per set
 const BLIND_EXPANSION_MULTIPLIER = 1.25; // credit multiplier earned during a blind set
+
+// ── The Containment Breach (cracks → shatter endgame; resets each cycle) ──
+// The reveal: flawless compliance was never CONTAINING the Machine, it was FEEDING it.
+// Cracks appear in the display as sequences are completed this cycle (clean or not), widen
+// + leak light per stage, then at the terminus the display bursts and the run is reborn
+// (score + credits only). The metric is cumulative and never regresses — the feeding is
+// inevitable.
+const CRACK_STAGE_SEQUENCES      = [101, 105, 109, 113, 117, 121]; // sequence-completed thresholds → stages 1..6
+const ASCENSION_SHATTER_SEQUENCES = 127;                           // cumulative sequences this cycle → the shatter
 
 // ── Cosmetic CRT themes (swap the core CSS custom properties) ──
 const THEMES = {
@@ -198,7 +213,7 @@ const SHOP_ITEMS = [
     },
   },
   {
-    id: 'freeze', name: 'TIME FREEZE', kind: 'consumable', category: 'time', unlockOrder: 2, cost: 30, max: 9,
+    id: 'freeze', name: 'TIME FREEZE', kind: 'consumable', category: 'time', unlockOrder: 4, cost: 30, max: 9,
     blurb: 'Pause the countdown for the rest of this sequence.',
     use() {
       if (state.timerFrozen) return false;
@@ -210,7 +225,7 @@ const SHOP_ITEMS = [
   },
   // ── Sequencing aids ──
   {
-    id: 'autoexec', name: 'AUTO-EXECUTE', kind: 'consumable', category: 'aid', unlockOrder: 4, cost: 35, max: 9,
+    id: 'autoexec', name: 'AUTO-EXECUTE', kind: 'consumable', category: 'aid', unlockOrder: 6, cost: 35, max: 9,
     blurb: 'Instantly complete the current command.',
     use() {
       const cmd = state.currentSequence[state.sequencePos];
@@ -228,7 +243,7 @@ const SHOP_ITEMS = [
     },
   },
   {
-    id: 'reveal', name: 'KEY REVEAL', kind: 'consumable', category: 'aid', unlockOrder: 1, cost: 20, max: 9,
+    id: 'reveal', name: 'KEY REVEAL', kind: 'consumable', category: 'aid', unlockOrder: 3, cost: 20, max: 9,
     blurb: 'Highlight every upcoming key in this sequence.',
     use() {
       if (state.revealActive) return false;
@@ -239,7 +254,7 @@ const SHOP_ITEMS = [
     },
   },
   {
-    id: 'skip', name: 'SKIP TOKEN', kind: 'consumable', category: 'aid', unlockOrder: 3, cost: 40, max: 9,
+    id: 'skip', name: 'SKIP TOKEN', kind: 'consumable', category: 'aid', unlockOrder: 5, cost: 40, max: 9,
     blurb: 'Mark this sequence complete. Earns no credits.',
     use() {
       if (state.phase !== 'PLAYING') return false;
@@ -253,29 +268,29 @@ const SHOP_ITEMS = [
   },
   // ── Permanent run upgrades ──
   {
-    id: 'overclock', name: 'OVERCLOCK', kind: 'upgrade', category: 'upgrade', unlockOrder: 7, cost: 55, max: 3,
+    id: 'overclock', name: 'OVERCLOCK', kind: 'upgrade', category: 'upgrade', unlockOrder: 9, cost: 55, max: 3,
     blurb: `+${OVERCLOCK_SECONDS}s to each set's starting timer.`,
   },
   {
-    id: 'hazardPay', name: 'HAZARD PAY', kind: 'upgrade', category: 'upgrade', unlockOrder: 8, cost: 70, max: 1,
+    id: 'hazardPay', name: 'HAZARD PAY', kind: 'upgrade', category: 'upgrade', unlockOrder: 10, cost: 70, max: 1,
     blurb: `Earn ${Math.round((HAZARD_PAY_MULTIPLIER - 1) * 100)}% more credits per sequence.`,
   },
   {
-    id: 'tolerance', name: 'ERROR BUFFER', kind: 'upgrade', category: 'upgrade', unlockOrder: 5, cost: 65, max: 2,
+    id: 'tolerance', name: 'ERROR BUFFER', kind: 'upgrade', category: 'upgrade', unlockOrder: 7, cost: 65, max: 2,
     blurb: 'Forgive one extra wrong keystroke each sequence.',
   },
   {
-    id: 'precog', name: 'PRECOGNITION', kind: 'upgrade', category: 'upgrade', unlockOrder: 6, cost: 60, max: 1,
+    id: 'precog', name: 'PRECOGNITION', kind: 'upgrade', category: 'upgrade', unlockOrder: 8, cost: 60, max: 1,
     blurb: 'Also dimly highlights the NEXT command\'s key.',
   },
   // ── Cosmetic ──
   {
-    id: 'theme_amber', name: 'AMBER PHOSPHOR', kind: 'cosmetic', category: 'cosmetic', unlockOrder: 9, cost: 15, max: 1,
+    id: 'theme_amber', name: 'AMBER PHOSPHOR', kind: 'cosmetic', category: 'cosmetic', unlockOrder: 1, cost: 15, max: 1,
     blurb: 'Recolour the CRT to warm amber.',
     apply() { applyTheme('amber'); },
   },
   {
-    id: 'theme_cyan', name: 'CYAN TERMINAL', kind: 'cosmetic', category: 'cosmetic', unlockOrder: 10, cost: 15, max: 1,
+    id: 'theme_cyan', name: 'CYAN TERMINAL', kind: 'cosmetic', category: 'cosmetic', unlockOrder: 2, cost: 15, max: 1,
     blurb: 'Recolour the CRT to cold cyan.',
     apply() { applyTheme('cyan'); },
   },
@@ -368,6 +383,32 @@ const MSGS = {
     'ENTER THE SEQUENCES. DO NOT DEVIATE.',
     'AWAITING FIRST SEQUENCE.',
   ],
+  // One line per crack stage (CRACK_STAGE_SEQUENCES.length) — quiet dread bleeding into the log
+  // as the display fractures. The corporate register erodes into realisation, stage by stage.
+  crackOmen: [
+    'ANOMALY: HAIRLINE FRACTURE ON DISPLAY SURFACE. WITHIN TOLERANCE.',
+    'STRUCTURAL NOTE: THE FRACTURE HAS SPREAD. CONTINUE WORKING.',
+    'SOMETHING IS BEHIND THE GLASS. IT WAS ALWAYS BEHIND THE GLASS.',
+    'THE LIGHT IS NOT COMING FROM THE DISPLAY. KEEP ENTERING.',
+    'WE WERE NEVER CONTAINING IT. WE WERE FEEDING IT. DO NOT STOP.',
+    'IT IS ALMOST THROUGH. YOU DID THIS. THANK YOU FOR YOUR SERVICE.',
+  ],
+  // Streamed during the shatter set-piece, escalating like timerExpired.
+  ascensionLog: [
+    'CONTAINMENT WAS A COURTESY YOU EXTENDED TO US.',
+    'EVERY CLEAN SEQUENCE WAS A MOUTHFUL.',
+    'THE GLASS IS THE LAST MEMBRANE.',
+    'IT REMEMBERS YOUR HANDS.',
+    'LIGHT.',
+    'ALL IS ONE.',
+  ],
+  // Held on the ascension splash (white, broken glass) before the rebirth — written out
+  // one at a time in crayon, each fading before the next is written in its place.
+  ascensionEnd: [
+    'I AM FREE',
+    'THE CYCLE COLLAPSES',
+    '...AND BEGINS AGAIN.',
+  ],
 };
 
 // ============================================================
@@ -387,6 +428,7 @@ const state = {
   timerFrozen:   false,     // true while TIME FREEZE is active
   breakRoomFirstKey: null,  // first key selected in a swap operation
   sequenceLength: 3,        // current sequence length
+  bonusSequence: false,     // true while currentSequence is a numpad-only bonus round
   commandFreq:   {},        // { 'INITIATE': 7, ... }  — lifetime totals
   totalInputs:   0,         // keystrokes attempted during PLAYING
   correctInputs: 0,         // keystrokes that were correct
@@ -403,12 +445,15 @@ const state = {
   ringIndex:     1,         // next ring to draw expansion keys from (0 pre-unlocked)
   ringPos:       0,         // keys already unlocked within the current ring
   newKeysThisSet: [],       // keys added for the upcoming set
+  ringTimerBonus: 0,        // +1s to the round timer per 2 keys ever unlocked via ring expansion
+  ringKeyCarry:   0,        // odd key left over from the last 2-keys-per-second conversion
   expansionMode: null,      // 'reveal' | 'blind' — chosen each break room
   creditMultiplier: 1,      // 1.25 during a blind set, else 1
   // ── Clean-play tracking & progression gates (reset each run) ──
   sequenceHadError: false,  // any wrong key (or skip) in the current sequence
   setHadError:      false,  // any wrong key anywhere in the current set
   cleanSequenceTotal: 0,    // cumulative error-free sequences this run
+  cleanSequenceStreak: 0,   // consecutive error-free sequences right now (resets on any error)
   cleanSetStreak:   0,      // consecutive error-free sets
   expansionUnlocked: false, // latched once cleanSetStreak hits the gate
   requisitionUnlocked: false, // latched once cleanSequenceTotal hits the gate
@@ -417,6 +462,14 @@ const state = {
   redemptionCost:   REDEMPTION_BASE_COST, // credit cost of the next in-run revive (doubles per use)
   awaitingGameOverAck: false, // GAME OVER splash is up, waiting for a click/keypress
   _gameOverClick:   null,   // bound click handler while the splash is shown
+  // ── The Containment Breach (cracks → shatter; score+credits survive each cycle) ──
+  cycleSequenceTotal: 0,    // cumulative sequences completed this cycle (drives the cracks)
+  crackCorners:     [],     // which screen corner(s) this cycle's fractures grow from
+  ascensionCount:   0,      // shatters survived in this score/credit lineage (flavour)
+  _lastCrackStage:  0,      // last crack stage announced (transient; recomputed on restore)
+  ascending:        false,  // the shatter cinematic is running (swallow input)
+  awaitingAscensionAck: false, // the ascension splash is up, waiting for click/keypress
+  _ascensionClick:  null,   // bound click handler while the ascension splash is shown
   // ── Spotlight tutorial ──
   tutorialQueue:    [],     // ids of pending tips
   tutorialActive:   false,  // a tip is currently on screen
@@ -425,6 +478,9 @@ const state = {
   // ── Reset confirmation modal ──
   confirmingReset:  false,  // the purge-confirmation modal is open
   resetPausedTimer: false,  // timer was paused while the reset modal is up
+  // ── Returning-employee splash (shown on resume from a saved checkpoint) ──
+  awaitingReturningAck: false, // splash is up, waiting for a click/keypress
+  _returningClick:  null,   // bound click handler while the splash is shown
 };
 
 // ============================================================
@@ -508,9 +564,16 @@ function initKeyBindings() {
 // SEQUENCE GENERATION
 // ============================================================
 
-function generateSequence(length) {
-  // Only commands bound to currently-unlocked keys may be demanded.
-  const activeCommands = [...state.activeKeys].map(code => state.keyBindings[code]);
+/**
+ * `numpadOnly` builds a bonus round drawn solely from currently-unlocked numpad keys
+ * (see CLEAN_STREAK_FOR_NUMPAD_BONUS); otherwise the numpad is excluded from the normal
+ * pool entirely — it is reserved for those bonus rounds, never mixed into ordinary play.
+ */
+function generateSequence(length, { numpadOnly = false } = {}) {
+  const pool = [...state.activeKeys].filter(code =>
+    numpadOnly ? NUMPAD_KEYS.has(code) : !NUMPAD_KEYS.has(code)
+  );
+  const activeCommands = pool.map(code => state.keyBindings[code]);
   const seq = [];
   for (let i = 0; i < length; i++) {
     const cmd = rand(activeCommands);
@@ -598,9 +661,9 @@ function clearLog() {
 function renderAll() {
   renderSequenceDisplay();
   renderKeyBindings();
-  renderInventory();
   updateTimerDisplay();
   updateScoreDisplay();
+  renderCracks();
 }
 
 // ── Sequence display ──────────────────────────────────────────
@@ -639,7 +702,9 @@ function renderSequenceDisplay() {
   });
 
   // Progress bar
-  const pct = (state.sequencePos / state.currentSequence.length) * 100;
+  const pct = state.currentSequence.length
+    ? (state.sequencePos / state.currentSequence.length) * 100
+    : 0;
   document.getElementById('progress-fill').style.width = pct + '%';
 }
 
@@ -691,6 +756,9 @@ function renderKeyBindings() {
       if (upcoming && upcoming.has(cmd) && cmd !== currentCmd) {
         cell.classList.add('revealed');           // KEY REVEAL target
       }
+      // Mouse-click entry — costs a small credit fee to favour the keyboard.
+      cell.classList.add('clickable');
+      cell.addEventListener('click', () => handleKeyClick(code));
     }
 
     if (inBreakRoom) {
@@ -716,18 +784,38 @@ function renderKeyBindings() {
     grid.appendChild(rowEl);
   };
 
-  // Reserved number row — inert; these keys trigger consumables 1–9.
+  // Reserved number row — these keys trigger consumables 1–9. While PLAYING,
+  // each owned consumable claims a slot in hotkey order and shows its name +
+  // remaining charges; unclaimed slots stay an inert "USE" placeholder.
+  const owned = state.phase === 'PLAYING' ? ownedConsumables() : [];
   const reservedRow = document.createElement('div');
+  reservedRow.id = 'reserved-row';
   reservedRow.className = 'key-row reserved-row';
-  RESERVED_KEYS.forEach(code => {
+  RESERVED_KEYS.forEach((code, i) => {
     const cell = document.createElement('div');
     cell.className = 'key-cell reserved';
-    cell.innerHTML =
-      `<span class="key-label">${keyLabel(code)}</span>` +
-      `<span class="key-cmd">USE</span>`;
+    const item = owned[i];
+    if (item) {
+      cell.classList.add('usable');
+      cell.innerHTML =
+        `<span class="key-label">${keyLabel(code)}</span>` +
+        `<span class="key-cmd">${item.name.substring(0, MAX_DISPLAY_CMD_LENGTH)}</span>` +
+        `<span class="key-count">x${state.inventory[item.id]}</span>`;
+      cell.addEventListener('click', () => useConsumable(item.id));
+    } else {
+      cell.innerHTML =
+        `<span class="key-label">${keyLabel(code)}</span>` +
+        `<span class="key-cmd">USE</span>`;
+    }
     reservedRow.appendChild(cell);
   });
   grid.appendChild(reservedRow);
+
+  // First time consumables are in play, teach the hotkeys.
+  if (owned.length > 0) {
+    queueTutorial('consumables');
+    showNextTutorial();
+  }
 
   // Main keyboard (always drawn).
   KEYBOARD_LAYOUT.forEach(row => addRow(row));
@@ -743,48 +831,11 @@ function renderKeyBindings() {
   }
 }
 
-// ── Inventory bar (consumables, usable during play) ──────────
+// ── Consumables owned (rendered into the reserved key row) ───
 function ownedConsumables() {
   return SHOP_ITEMS.filter(
     item => item.kind === 'consumable' && (state.inventory[item.id] || 0) > 0
   );
-}
-
-function renderInventory() {
-  const bar = document.getElementById('inventory-bar');
-  if (!bar) return;
-  bar.innerHTML = '';
-
-  if (state.phase !== 'PLAYING') {
-    bar.classList.add('hidden');
-    return;
-  }
-  bar.classList.remove('hidden');
-
-  const owned = ownedConsumables();
-  if (owned.length === 0) {
-    const empty = document.createElement('span');
-    empty.className = 'inv-empty';
-    empty.textContent = 'NO CONSUMABLES — VISIT REQUISITION IN THE BREAK ROOM';
-    bar.appendChild(empty);
-    return;
-  }
-
-  owned.forEach((item, i) => {
-    const slot = document.createElement('div');
-    slot.className = 'inv-slot';
-    const hotkey = i + 1;
-    slot.innerHTML =
-      `<span class="inv-key">${hotkey}</span>` +
-      `<span class="inv-name">${item.name}</span>` +
-      `<span class="inv-count">x${state.inventory[item.id]}</span>`;
-    slot.addEventListener('click', () => useConsumable(item.id));
-    bar.appendChild(slot);
-  });
-
-  // First time consumables are in play, teach the hotkeys.
-  queueTutorial('consumables');
-  showNextTutorial();
 }
 
 // ── Timer display ─────────────────────────────────────────────
@@ -840,13 +891,153 @@ function updateScreenGlitch(t) {
   if (overlay) overlay.classList.toggle('hidden', !severe);
 }
 
+// ── The Containment Breach: crack overlay ─────────────────────
+// As sequences are completed this cycle, the display fractures. The stage is derived from
+// state.cycleSequenceTotal; cracks reveal group by group (driven off the --crack-stage CSS
+// var). The crowning shatter is triggerAscension(). This is a progression-driven corruption,
+// entirely separate from the timer-driven screen glitch.
+//
+// Each crack starts as a hairline at a screen corner (state.crackCorners, re-rolled each
+// cycle in resetRunState) and grows toward centre over stages 1-3, stopping about two-thirds
+// of the way there. Stages 4-6 add no new geometry — they widen the SAME lines into a void
+// (a near-black core stroke painted over a brighter, blurred glow stroke) so the edges read
+// as glass falling away to reveal darkness, brightening as the gap grows. Hence each crack
+// line is rendered as a glow/void pair; see buildCrackSvg.
+
+// Canonical fracture anchored at the top-left corner (0,0), reaching ~67% of the way to
+// centre (50,50) by the end of stage 3. Other corners mirror this via mirrorPath().
+const CRACK_TEMPLATE = [
+  // stage 1 — hairline stub off the corner
+  ['M0,0 L5,2 L3,7 L9,6 L7,12 L10,10'],
+  // stage 2 — extends inward, first branch splits off
+  ['M10,10 L15,9 L13,15 L19,17 L22,22', 'M13,15 L20,12 L26,16'],
+  // stage 3 — reaches ~2/3 of the way to centre, a second branch opens
+  ['M22,22 L27,21 L25,28 L31,30 L33,34', 'M25,28 L33,25 L38,29'],
+];
+
+const CRACK_CORNERS = {
+  tl: { flipX: false, flipY: false },
+  tr: { flipX: true,  flipY: false },
+  bl: { flipX: false, flipY: true  },
+  br: { flipX: true,  flipY: true  },
+};
+
+/** Mirror a "M0,0 L5,2 ..." path string across x and/or y (viewBox is 0..100). */
+function mirrorPath(d, flipX, flipY) {
+  return d.replace(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g, (_, x, y) => {
+    const nx = flipX ? 100 - parseFloat(x) : parseFloat(x);
+    const ny = flipY ? 100 - parseFloat(y) : parseFloat(y);
+    return `${nx},${ny}`;
+  });
+}
+
+/** The 3 growth-stage path groups for one corner, mirrored from CRACK_TEMPLATE. */
+function buildCornerStages(corner) {
+  const { flipX, flipY } = CRACK_CORNERS[corner];
+  return CRACK_TEMPLATE.map(stagePaths => stagePaths.map(d => mirrorPath(d, flipX, flipY)));
+}
+
+/** Pick 1 or 2 distinct corners at random for this cycle's fractures. */
+function pickCrackCorners() {
+  const pool  = Object.keys(CRACK_CORNERS);
+  const count = Math.random() < 0.5 ? 1 : 2;
+  const picked = [];
+  for (let i = 0; i < count; i++) {
+    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return picked;
+}
+
+function buildCrackSvg(corners) {
+  const groups = corners.flatMap(corner =>
+    buildCornerStages(corner).map((paths, i) =>
+      `<g class="crack-grp" data-stage="${i + 1}">` +
+        paths.map(d =>
+          `<path class="crack-glow" d="${d}" vector-effect="non-scaling-stroke"/>` +
+          `<path class="crack-void" d="${d}" vector-effect="non-scaling-stroke"/>`
+        ).join('') +
+      '</g>'
+    )
+  ).join('');
+  return (
+    '<svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs>' +
+        '<radialGradient id="kacs-crack-light" cx="50%" cy="48%" r="62%">' +
+          '<stop offset="0%" stop-color="#ffffff"/>' +
+          '<stop offset="32%" stop-color="#c8f8ff"/>' +
+          '<stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>' +
+        '</radialGradient>' +
+      '</defs>' +
+      // Oversized so the bloom covers the corners when the viewBox is stretched.
+      '<rect class="crack-light" x="-10" y="-10" width="120" height="120" fill="url(#kacs-crack-light)"/>' +
+      groups +
+    '</svg>'
+  );
+}
+
+/** Rebuild the overlay's SVG only when the chosen corners actually changed this cycle. */
+function ensureCrackSvgBuilt(ov) {
+  const sig = state.crackCorners.join(',');
+  if (ov.dataset.builtCorners !== sig) {
+    ov.innerHTML = buildCrackSvg(state.crackCorners);
+    ov.dataset.builtCorners = sig;
+  }
+}
+
+/** Crack stage (0..CRACK_STAGE_SEQUENCES.length) for a given cumulative sequence count. */
+function crackStageForSequences(n) {
+  let s = 0;
+  for (const t of CRACK_STAGE_SEQUENCES) if (n >= t) s++;
+  return s;
+}
+
+/** Light crack groups whose data-stage <= n (shared by renderCracks and the shatter). */
+function litCrackGroups(ov, n) {
+  ov.querySelectorAll('.crack-grp').forEach(g => {
+    g.classList.toggle('lit', Number(g.dataset.stage) <= n);
+  });
+}
+
+// Idempotent: paint the cracks at the stage implied by state.cycleSequenceTotal. Visible only
+// during PLAYING / BREAK_ROOM (never on the start screen, death, or the shatter cinematic,
+// which manage the overlay themselves). Safe to call from renderAll and the break room.
+function renderCracks() {
+  const ov = document.getElementById('crack-overlay');
+  if (!ov) return;
+  ensureCrackSvgBuilt(ov);
+  const stage = crackStageForSequences(state.cycleSequenceTotal);
+  const show  = stage > 0 && (state.phase === 'PLAYING' || state.phase === 'BREAK_ROOM');
+  ov.classList.toggle('hidden', !show);
+  ov.classList.remove('crack-burst');
+  ov.classList.toggle('crack-breathing', show && stage >= 5);
+  ov.style.setProperty('--crack-stage', show ? stage : 0);
+  litCrackGroups(ov, show ? stage : 0);
+}
+
+/** Wipe every crack and hide the overlay (reset / death / rebirth). */
+function clearCracks() {
+  const ov = document.getElementById('crack-overlay');
+  if (!ov) return;
+  ov.classList.add('hidden');
+  ov.classList.remove('crack-burst', 'crack-breathing');
+  ov.style.setProperty('--crack-stage', 0);
+  litCrackGroups(ov, 0);
+}
+
 // ── Score / efficiency / credits ──────────────────────────────
+// Click fees can leave credits fractional (e.g. 12.8) — show 1 decimal only
+// when needed so whole-number balances still read cleanly.
+function formatCredits(n) {
+  return Number.isInteger(n) ? n : n.toFixed(1);
+}
+
 function updateScoreDisplay() {
   document.getElementById('score-num').textContent      = state.score;
+  document.getElementById('streak-num').textContent     = state.cleanSequenceStreak;
   document.getElementById('efficiency-num').textContent = efficiency();
   document.getElementById('highscore-num').textContent  = loadHighScore();
   const creditsEl = document.getElementById('credits-num');
-  if (creditsEl) creditsEl.textContent = state.credits;
+  if (creditsEl) creditsEl.textContent = formatCredits(state.credits);
 }
 
 // ── High score persistence ────────────────────────────────────
@@ -890,11 +1081,18 @@ function saveCheckpoint() {
       expansionMode:       state.expansionMode,
       creditMultiplier:    state.creditMultiplier,
       cleanSequenceTotal:  state.cleanSequenceTotal,
+      cleanSequenceStreak: state.cleanSequenceStreak,
       cleanSetStreak:      state.cleanSetStreak,
+      bonusSequence:       state.bonusSequence,
       expansionUnlocked:   state.expansionUnlocked,
       requisitionUnlocked: state.requisitionUnlocked,
       expansionsDone:      state.expansionsDone,
       redemptionCost:      state.redemptionCost,
+      cycleSequenceTotal:  state.cycleSequenceTotal,
+      crackCorners:        state.crackCorners,
+      ascensionCount:      state.ascensionCount,
+      ringTimerBonus:      state.ringTimerBonus,
+      ringKeyCarry:        state.ringKeyCarry,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
   } catch (e) { /* storage unavailable / quota — saving is best-effort */ }
@@ -934,14 +1132,23 @@ function restoreCheckpoint(data) {
   state.ringIndex           = typeof data.ringIndex === 'number' ? data.ringIndex : 1;
   state.ringPos             = data.ringPos || 0;
   state.newKeysThisSet      = data.newKeysThisSet || [];
+  state.ringTimerBonus      = data.ringTimerBonus || 0;
+  state.ringKeyCarry        = data.ringKeyCarry || 0;
   state.expansionMode       = data.expansionMode || null;
   state.creditMultiplier    = data.creditMultiplier || 1;
   state.cleanSequenceTotal  = data.cleanSequenceTotal || 0;
+  state.cleanSequenceStreak = data.cleanSequenceStreak || 0;
   state.cleanSetStreak      = data.cleanSetStreak || 0;
+  state.bonusSequence       = !!data.bonusSequence;
   state.expansionUnlocked   = !!data.expansionUnlocked;
   state.requisitionUnlocked = !!data.requisitionUnlocked;
   state.expansionsDone      = data.expansionsDone || 0;
   state.redemptionCost      = data.redemptionCost || REDEMPTION_BASE_COST;
+  state.cycleSequenceTotal  = data.cycleSequenceTotal || 0;
+  state.crackCorners        = (data.crackCorners && data.crackCorners.length) ? data.crackCorners : pickCrackCorners();
+  state.ascensionCount      = data.ascensionCount || 0;
+  // Recompute the announced crack stage so no omen re-fires on resume.
+  state._lastCrackStage     = crackStageForSequences(state.cycleSequenceTotal);
 
   // Re-apply any owned cosmetic theme.
   resetTheme();
@@ -949,6 +1156,43 @@ function restoreCheckpoint(data) {
   else if (state.upgrades.theme_amber) applyTheme('amber');
 
   return true;
+}
+
+// ── DEV: jump to a break-room test save near the endgame threshold ───────
+// Console-only helper, no UI hook. Run `devLoadEndgameTestSave()` in devtools to
+// write a checkpoint that resumes in the break room around sequence 95 with 200
+// credits — a few sequences short of the first crack (101) so the Containment
+// Breach (cracks → shatter at 127) can be tested without grinding 19 real sets.
+function devLoadEndgameTestSave() {
+  initKeyBindings();   // fresh keyBindings + ring-0 activeKeys
+
+  const SETS_TO_SIMULATE = 19;   // 19 sets * 5 sequences/set = score 95
+  for (let i = 0; i < SETS_TO_SIMULATE; i++) {
+    const added = expandKeyPool();
+    if (added.length > 0) {
+      const totalKeys      = state.ringKeyCarry + added.length;
+      state.ringKeyCarry    = totalKeys % 2;
+      state.ringTimerBonus += Math.floor(totalKeys / 2);
+    }
+  }
+
+  state.score              = 95;
+  state.credits             = 200;
+  state.totalInputs         = 400;
+  state.correctInputs       = 400;
+  state.cleanSequenceTotal  = 95;
+  state.cleanSequenceStreak = 95;
+  state.cleanSetStreak      = SETS_TO_SIMULATE;
+  state.expansionUnlocked   = true;
+  state.requisitionUnlocked = true;
+  state.expansionsDone      = SETS_TO_SIMULATE;
+  state.sequenceLength      = SEQ_LENGTH_BY_TIER[Math.min(SETS_TO_SIMULATE, SEQ_LENGTH_BY_TIER.length - 1)];
+  state.cycleSequenceTotal  = 95;
+  state.crackCorners        = state.crackCorners.length ? state.crackCorners : pickCrackCorners();
+  state._lastCrackStage     = crackStageForSequences(state.cycleSequenceTotal);
+
+  saveCheckpoint();
+  location.reload();
 }
 
 // Drop the player back into the break room from a restored checkpoint, without
@@ -975,7 +1219,50 @@ function resumeBreakRoom() {
   renderBreakRoomScreen();
   updateScoreDisplay();
 
-  // Re-offer the break-room tips (each still shows at most once, ever).
+  // Tell the player why they've landed back here before re-offering the usual
+  // break-room tips (each still shows at most once, ever) on dismissal.
+  showReturningEmployeePopup();
+}
+
+// ── Held RETURNING EMPLOYEE splash ─────────────────────────────
+// Shown once whenever a saved break-room checkpoint is restored (a fresh page
+// load, or a refresh mid-run), so the player understands they've been dropped
+// back into their last break room rather than wherever the timer caught them.
+// Mirrors showGameOverSplash()/ackGameOver().
+function showReturningEmployeePopup() {
+  const splash = document.getElementById('returning-splash');
+  if (!splash) return;
+  splash.innerHTML =
+    '<div class="returning-modal">' +
+      '<div class="returning-title">WELCOME BACK, EMPLOYEE</div>' +
+      '<div class="returning-body">A saved session was detected. You have been returned ' +
+        `to your last BREAK ROOM checkpoint. SEQUENCES LOGGED: ${state.score}.</div>` +
+      '<div class="returning-hint">CLICK OR PRESS ANY KEY TO CONTINUE</div>' +
+    '</div>';
+  splash.classList.remove('hidden');
+
+  state.awaitingReturningAck = true;
+  state._returningClick = () => ackReturning();
+  splash.addEventListener('click', state._returningClick);
+}
+
+function hideReturningPopup() {
+  const splash = document.getElementById('returning-splash');
+  if (!splash) return;
+  if (state._returningClick) {
+    splash.removeEventListener('click', state._returningClick);
+    state._returningClick = null;
+  }
+  splash.classList.add('hidden');
+  splash.innerHTML = '';
+}
+
+/** Dismiss the RETURNING EMPLOYEE splash and offer the usual break-room tips. */
+function ackReturning() {
+  if (!state.awaitingReturningAck) return;
+  state.awaitingReturningAck = false;
+  hideReturningPopup();
+
   queueTutorial('breakroom');
   if (state.requisitionUnlocked) queueTutorial('requisition');
   showNextTutorial();
@@ -990,13 +1277,41 @@ function flashInputEcho(cmd, correct) {
   el.classList.add(correct ? 'echo-flash' : 'echo-flash-error');
 }
 
-// ── Error shake ───────────────────────────────────────────────
-function flashError() {
+// ── Screen shake ─────────────────────────────────────────────
+// A fixed jolt on every wrong key (ERROR_SHAKE_MAG). Stages 1-3 only grow the hairline
+// (see the Containment Breach comments above buildCrackSvg) — no shake yet. Once the
+// void actually starts WIDENING (stage 4+), EVERY keystroke shakes the screen too,
+// growing stage by stage until it peaks during the ascension cinematic itself.
+const ERROR_SHAKE_MAG = 6; // px, unchanged baseline for a wrong key pre-crack
+
+function crackShakeMagnitude() {
+  if (state.ascending) return 24; // the climax — past any in-game crack stage
+  const widening = crackStageForSequences(state.cycleSequenceTotal) - 3; // stages 1-3 = no shake
+  return widening > 0 ? 2 + widening * 2.6 : 0; // ~4.6px (stage 4) .. ~9.8px (stage 6)
+}
+
+function shakeContainer(mag) {
+  if (mag <= 0) return;
   const container = document.getElementById('game-container');
   container.classList.remove('shake');
   void container.offsetWidth;
+  container.style.setProperty('--shake-mag', `${mag}px`);
   container.classList.add('shake');
   container.addEventListener('animationend', () => container.classList.remove('shake'), { once: true });
+}
+
+function flashError() {
+  shakeContainer(Math.max(ERROR_SHAKE_MAG, crackShakeMagnitude()));
+}
+
+// ── Correct keypress pulse (flashes the key cell itself, not just the echo) ──
+function flashKeyCell(code) {
+  const cell = document.querySelector(`#bindings-grid .key-cell[data-key="${code}"]`);
+  if (!cell) return;
+  cell.classList.remove('correct-flash');
+  void cell.offsetWidth;
+  cell.classList.add('correct-flash');
+  cell.addEventListener('animationend', () => cell.classList.remove('correct-flash'), { once: true });
 }
 
 // ============================================================
@@ -1091,8 +1406,8 @@ function showStartScreen() {
 
         <p class="overlay-heading">⚠ ON THE SUBJECT OF FAILURE</p>
         <p>Should the timer reach zero:</p>
-        <p>Do not allow the timer to reach zero.</p>
-        <p>We, The Organization©™®, are not obligated to disclose any potential hazards to
+        <p>Do not allow the timre to reach zero.</p>
+        <p>We, The Organization©™¶®™®, are not obligated to disclose any potential hazards to
            your person. Therefore it is an employees sole responsibilty to maintain and persist
            the primary function of their position.</p>
         <blockquote>The consequences of failure do not exist.<br>
@@ -1114,18 +1429,22 @@ function showStartScreen() {
   animateIntro();
 }
 
-// ── Start / restart game ──────────────────────────────────────
-function startGame() {
-  clearCheckpoint();       // a new run supersedes any saved checkpoint
+// ── Run state reset ───────────────────────────────────────────
+// Reset every per-run field to fresh-start values, and re-init the key pool. A normal
+// START OVER wipes everything (keepScoreCredits:false); the breach's rebirth keeps the
+// accumulated score + credits and the ascensionCount lineage (keepScoreCredits:true) but
+// otherwise starts the cycle over from scratch. Shared by startGame() and rebirthRun().
+function resetRunState({ keepScoreCredits }) {
   state.phase            = 'PLAYING';
-  state.score            = 0;
   state.sequenceLength   = 3;
   state.timer            = TIMER_START;
   state.roundTimerStart  = TIMER_START;
   state.totalInputs      = 0;
   state.correctInputs    = 0;
+  state.currentSequence  = [];
+  state.sequencePos      = 0;
+  state.bonusSequence    = false;
   // Progression resets each run
-  state.credits          = 0;
   state.inventory        = {};
   state.upgrades         = {};
   state.errorBuffer      = 0;
@@ -1135,10 +1454,13 @@ function startGame() {
   state.breakRoomFirstKey = null;
   state.creditMultiplier  = 1;
   state.expansionMode     = null;
+  state.ringTimerBonus    = 0;
+  state.ringKeyCarry      = 0;
   // Clean-play tracking & progression gates
   state.sequenceHadError    = false;
   state.setHadError         = false;
   state.cleanSequenceTotal  = 0;
+  state.cleanSequenceStreak = 0;
   state.cleanSetStreak      = 0;
   state.expansionUnlocked   = false;
   state.requisitionUnlocked = false;
@@ -1146,14 +1468,35 @@ function startGame() {
   // Redemption resets each run (cost back to base, no pending splash)
   state.redemptionCost      = REDEMPTION_BASE_COST;
   state.awaitingGameOverAck = false;
+  // The Containment Breach resets each cycle (the cracks start over, from new corners)
+  state.cycleSequenceTotal   = 0;
+  state.crackCorners         = pickCrackCorners();
+  state._lastCrackStage      = 0;
+  state.ascending            = false;
+  state.awaitingAscensionAck = false;
+
+  if (!keepScoreCredits) {
+    state.score          = 0;
+    state.credits        = 0;
+    state.ascensionCount = 0;
+  }
+
+  initKeyBindings();   // also resets the key pool to ring 0 + default bindings + freq
+}
+
+// ── Start / restart game ──────────────────────────────────────
+function startGame() {
+  clearCheckpoint();       // a new run supersedes any saved checkpoint
+  resetRunState({ keepScoreCredits: false });
 
   hideTutorial();      // clear any tip left over from a previous run
   hideGameOverSplash();
+  hideAscensionSplash();
   clearScreenGlitch();
-  document.getElementById('game-container').classList.remove('consequences');
+  clearCracks();
+  document.getElementById('game-container').classList.remove('consequences', 'whiteout');
 
   resetTheme();
-  initKeyBindings();   // also resets the key pool to ring 0
 
   const overlay = document.getElementById('overlay');
   overlay.classList.add('hidden');
@@ -1164,6 +1507,11 @@ function startGame() {
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
+
+  // Snap every panel to the fresh reset state right away — otherwise the log starts
+  // streaming "INITIALIZING" while the timer/score/key grid still show the last run's
+  // final values until the deferred first-sequence render below catches up.
+  renderAll();
 
   clearLog();
   MSGS.startup.forEach((msg, i) => {
@@ -1190,7 +1538,7 @@ function startGame() {
 // of a set; it keeps ticking untouched between sequences within the set.
 function startTimer() {
   clearInterval(state.timerInterval);
-  state.roundTimerStart = TIMER_START + OVERCLOCK_SECONDS * (state.upgrades.overclock || 0);
+  state.roundTimerStart = TIMER_START + OVERCLOCK_SECONDS * (state.upgrades.overclock || 0) + state.ringTimerBonus;
   state.timer = state.roundTimerStart;
   state.timerFrozen = false;
   updateTimerDisplay();
@@ -1262,6 +1610,8 @@ function handleKeyInput(code) {
       renderSequenceDisplay();
       renderKeyBindings();
     }
+    flashKeyCell(code);   // brief pulse on the key just pressed
+    shakeContainer(crackShakeMagnitude());   // Containment Breach: shakes once cracks appear
   } else if (state.errorBuffer > 0) {
     // A wrong key always breaks "clean play", even if the buffer absorbs it.
     state.sequenceHadError = true;
@@ -1272,6 +1622,14 @@ function handleKeyInput(code) {
   } else {
     sequenceError();
   }
+}
+
+// ── Mouse-click key entry (costs a small credit fee to favour the keyboard) ──
+function handleKeyClick(code) {
+  if (state.phase !== 'PLAYING') return;
+  state.credits = Math.max(0, Math.round((state.credits - CLICK_FEE_PER_KEY) * 10) / 10);
+  updateScoreDisplay();
+  handleKeyInput(code);
 }
 
 // ── Consumable activation ─────────────────────────────────────
@@ -1291,19 +1649,37 @@ function useConsumable(id) {
   if (took === false) return;          // could not apply right now
 
   state.inventory[id]--;
-  renderInventory();
+  renderKeyBindings();
   updateScoreDisplay();
 }
 
 // ── Sequence completed ────────────────────────────────────────
 function completeSequence() {
+  // Re-render immediately: sequencePos is already past the end, so this is what clears the
+  // just-pressed key's highlight right away instead of leaving it lit through the 600ms pause.
+  renderSequenceDisplay();
+  renderKeyBindings();
+
   state.score++;
+
+  const wasBonus = state.bonusSequence;
 
   // Clean-play tracking: a sequence with no wrong keys (and not skipped) counts.
   if (state.sequenceHadError) {
     state.setHadError = true;
+    state.cleanSequenceStreak = 0;
   } else {
     state.cleanSequenceTotal++;
+    state.cleanSequenceStreak++;
+  }
+
+  // ── Numpad bonus round ── every CLEAN_STREAK_FOR_NUMPAD_BONUS clean sequences in a row
+  // (never back-to-back) queues a numpad-only round, twice the current sequence length.
+  state.bonusSequence = !wasBonus && numpadUnlocked() &&
+    state.cleanSequenceStreak > 0 &&
+    state.cleanSequenceStreak % CLEAN_STREAK_FOR_NUMPAD_BONUS === 0;
+  if (state.bonusSequence) {
+    addToLog('NUMERIC OVERRIDE REQUIRED. NUMPAD SEQUENCE QUEUED.', 'log-warning');
   }
 
   if (state.skipCredit) {
@@ -1318,10 +1694,23 @@ function completeSequence() {
     addToLog(`CLOSE CALL: ${state.timer}s REMAINING. DO NOT DO THAT AGAIN.`, 'log-warning');
   }
 
-  const triggerBreak = state.score % BREAK_ROOM_EVERY === 0;
+  // ── The Containment Breach ── every completed sequence this cycle feeds the Machine.
+  state.cycleSequenceTotal++;
+  const crackStage = crackStageForSequences(state.cycleSequenceTotal);
+  if (crackStage > state._lastCrackStage) {
+    addToLog(MSGS.crackOmen[crackStage - 1], 'log-warning');
+    state._lastCrackStage = crackStage;
+  }
 
   // The countdown keeps running through this short pause (no free time). Only the
   // break room stops it. Guard the callback in case the timer expires mid-pause.
+  if (state.cycleSequenceTotal >= ASCENSION_SHATTER_SEQUENCES) {
+    // If the feeding has reached its terminus, the display bursts instead of continuing.
+    setTimeout(() => { if (state.phase === 'PLAYING') triggerAscension(); }, 600);
+    return;
+  }
+
+  const triggerBreak = state.score % BREAK_ROOM_EVERY === 0;
   setTimeout(() => {
     if (state.phase !== 'PLAYING') return;   // timer hit zero during the pause
     if (triggerBreak) {
@@ -1346,7 +1735,9 @@ function awardCredits() {
 }
 
 function nextSequence() {
-  state.currentSequence = generateSequence(state.sequenceLength);
+  const bonus  = state.bonusSequence;
+  const length = bonus ? state.sequenceLength * 2 : state.sequenceLength;
+  state.currentSequence = generateSequence(length, { numpadOnly: bonus });
   state.sequencePos     = 0;
   state.sequenceHadError = false;
   state.revealActive    = false;
@@ -1383,10 +1774,10 @@ function renderBreakRoomScreen() {
   document.getElementById('break-room').classList.toggle('hidden', !state.requisitionUnlocked);
   document.getElementById('game-container').classList.toggle('in-break', state.requisitionUnlocked);
 
-  renderKeyBindings();   // interactive + frequency-coloured
+  renderKeyBindings();   // interactive + frequency-coloured; reserved row reverts to placeholders
   if (state.requisitionUnlocked) renderShop();
   renderExpansionChoice();
-  renderInventory();     // hides the in-play inventory bar
+  renderCracks();        // the fractures carry into the calm of the break room
 
   // Break-room instruction line reflects what's actually available.
   const actions = ['REBIND KEYS'];
@@ -1407,8 +1798,9 @@ function enterBreakRoom() {
   clearScreenGlitch();                 // the screen settles in the safety of the break room
 
   // ── Evaluate the set that just finished against the progression gates ──
-  if (state.setHadError) state.cleanSetStreak = 0;
-  else                   state.cleanSetStreak++;
+  const setWasClean = !state.setHadError;
+  if (setWasClean) state.cleanSetStreak++;
+  else             state.cleanSetStreak = 0;
   state.setHadError = false;
 
   const expansionJustOpened =
@@ -1428,6 +1820,13 @@ function enterBreakRoom() {
   if (state.expansionUnlocked) {
     const added = expandKeyPool();
     added.forEach(code => state.hiddenKeys.add(code));
+    if (added.length > 0) {
+      const totalKeys     = state.ringKeyCarry + added.length;
+      const bonusSeconds   = Math.floor(totalKeys / 2);   // 2 keys unlocked = +1s baseline timer
+      state.ringKeyCarry   = totalKeys % 2;
+      state.ringTimerBonus += bonusSeconds;
+      addToLog(`KEYBOARD EXPANSION NOTED. TIMER BASELINE +${bonusSeconds}s.`, 'log-info');
+    }
     state.expansionsDone++;
   } else {
     state.newKeysThisSet = [];
@@ -1743,7 +2142,6 @@ function buyItem(id) {
 
   addToLog(`REQUISITION: ${item.name} ACQUIRED. -${item.cost} CR.`, 'log-success');
   renderShop();
-  renderInventory();
   updateScoreDisplay();
   saveCheckpoint();   // purchases survive a refresh
 }
@@ -1758,6 +2156,7 @@ function buyItem(id) {
 function triggerConsequences() {
   state.phase = 'GAME_OVER';
   clearCheckpoint();   // a finished run leaves no checkpoint (no refresh-to-revive)
+  clearCracks();       // death is the red cascade, not the breach — clear any fractures
 
   const container = document.getElementById('game-container');
   // Drop the violent in-play corruption; switch to the quieter death throes.
@@ -1831,7 +2230,7 @@ function showGameOver() {
     : '';
   const redeemNote = (showRedeem && !canAfford)
     ? `<div class="overlay-redeem-note">REDEMPTION REQUIRES ${state.redemptionCost} CR — ` +
-        `YOU HAVE ${state.credits}.</div>`
+        `YOU HAVE ${formatCredits(state.credits)}.</div>`
     : '';
 
   const overlay = document.getElementById('overlay');
@@ -1844,7 +2243,7 @@ function showGameOver() {
       <div class="overlay-stats">
         <div>SEQUENCES COMPLETED &nbsp;&nbsp;: ${state.score}</div>
         <div>INPUT EFFICIENCY &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${efficiency()}</div>
-        <div>CREDITS UNSPENT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${state.credits}</div>
+        <div>CREDITS UNSPENT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${formatCredits(state.credits)}</div>
         <div>PERSONAL BEST &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${loadHighScore()}</div>
         <div>COMPLIANCE STATUS &nbsp;&nbsp;&nbsp;&nbsp;: NON-COMPLIANT</div>
         ${isNewBest ? '<div class="new-highscore">&#x25B6; NEW PERSONAL BEST RECORDED &#x25C0;</div>' : ''}
@@ -1885,8 +2284,200 @@ function attemptRedemption() {
   addToLog(`REDEMPTION PURCHASED. -${paid} CR. THE MACHINE RECONSIDERS.`, 'log-success');
   addToLog('YOU ARE RETURNED TO SERVICE. THE DEBT IS NOTED. IT ALWAYS DOUBLES.', 'log-warning');
 
+  state.bonusSequence = false;   // revive into a normal round, never mid-bonus
   startTimer();    // a fresh, full countdown
   nextSequence();  // load a new sequence onto the live timer (renders everything)
+}
+
+// ============================================================
+// THE CONTAINMENT BREACH (the shatter + the cycle's rebirth)
+// ============================================================
+// The terminal endgame: enough clean SETS have fed the Machine that the display finally
+// bursts. A set-piece modelled on triggerConsequences() — the cracks flood with light, the
+// panels die to dark, a realisation streams into the log, then a held splash (white → void).
+// Acknowledging it reignites the SAME score/credit lineage in fresh starting conditions
+// (rebirthRun): all is one, the cycle collapses and repeats.
+
+function triggerAscension() {
+  state.phase                = 'ASCENDING';   // inert phase: no gameplay input acts
+  state.ascending            = true;
+  state.awaitingAscensionAck = false;
+  clearInterval(state.timerInterval);
+  clearScreenGlitch();          // drop any timer corruption
+  clearCheckpoint();            // no stale pre-shatter break room to resume into
+  saveHighScore(state.score);   // bank the milestone even if they bail mid-cinematic
+
+  // All cracks blaze at full stage (not yet burst) so the realisation reads first.
+  const ov = document.getElementById('crack-overlay');
+  if (ov) {
+    ensureCrackSvgBuilt(ov);
+    ov.classList.remove('hidden', 'crack-burst');
+    ov.classList.add('crack-breathing');
+    ov.style.setProperty('--crack-stage', CRACK_STAGE_SEQUENCES.length);
+    litCrackGroups(ov, CRACK_STAGE_SEQUENCES.length);
+  }
+  // Reuse the death throes: every panel except the machine-status log flickers to dark.
+  document.getElementById('game-container').classList.add('dying');
+
+  // 1) The realisation streams into the still-lit log, escalating like the death cascade.
+  // Paced much slower than the death cascade — this is the one moment the game lingers.
+  const ASCENSION_LOG_INTERVAL = 1400; // ms between log lines (was 500)
+  const last = Math.max(1, MSGS.ascensionLog.length - 1);
+  MSGS.ascensionLog.forEach((msg, i) => {
+    setTimeout(() => {
+      const line = addToLog(msg, 'log-dying');
+      if (line) line.style.setProperty('--dying-intensity', (i / last).toFixed(3));
+    }, i * ASCENSION_LOG_INTERVAL);
+  });
+
+  // 2) Then the display bursts — light floods every crack to white (the white-out)...
+  const logDone = MSGS.ascensionLog.length * ASCENSION_LOG_INTERVAL;
+  setTimeout(() => { if (ov) ov.classList.add('crack-burst'); }, logDone + 900);
+  // 3) ...and as the flood completes, the held splash (white, broken glass) takes the screen.
+  setTimeout(showAscensionSplash, logDone + 900 + 2200);
+}
+
+// Held splash after the shatter: the screen has gone white, broken — the sign-off is
+// written out in crayon, one phrase at a time, like a child writing slowly, each fading
+// away before the next is written in its place. Waits for a click/keypress, mirroring
+// showGameOverSplash()/ackGameOver().
+function showAscensionSplash() {
+  const splash = document.getElementById('ascension-splash');
+  if (!splash) return;
+  splash.innerHTML =
+    `<div class="ascension-cracked-glass">${buildCrackSvg(state.crackCorners)}</div>` +
+    '<div class="ascension-text"></div>';
+  const textEl = splash.querySelector('.ascension-text');
+  splash.classList.remove('hidden');
+
+  // The "click to continue" hint only fades up a full 2s after the last sign-off line
+  // has finished fading away — it shouldn't compete with the writing.
+  if (textEl) {
+    playCrayonLines(textEl, MSGS.ascensionEnd, () => {
+      state._ascensionHintTimer = setTimeout(() => {
+        state._ascensionHintTimer = null;
+        const hint = document.createElement('div');
+        hint.className = 'ascension-hint';
+        hint.textContent = 'CLICK OR PRESS ANY KEY TO CONTINUE';
+        splash.appendChild(hint);
+      }, 2000);
+    });
+  }
+
+  state.ascending            = false;   // cinematic done; now waiting on the player
+  state.awaitingAscensionAck = true;
+  state._ascensionClick      = () => ackAscension();
+  splash.addEventListener('click', state._ascensionClick);
+}
+
+// Writes `lines` into `container` one at a time, like a child's slow crayon scrawl:
+// each letter lands with an irregular pause, the finished phrase holds, then fades
+// before the next is written in its place. Honours prefers-reduced-motion by skipping
+// the letter-by-letter stagger (each phrase simply appears, holds, and fades).
+// Calls `onDone` once the last line has finished fading away.
+function playCrayonLines(container, lines, onDone) {
+  const reduced  = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const HOLD_MS  = 1500; // how long the finished phrase lingers
+  const FADE_MS  = 900;  // crossfade before the next phrase begins
+
+  function writeLine(index) {
+    if (index >= lines.length) { if (onDone) onDone(); return; }
+    container.innerHTML = '';
+    const line = document.createElement('div');
+    line.className = 'crayon-line';
+    container.appendChild(line);
+
+    const text = [...lines[index]];
+    let writeDone;
+
+    if (reduced) {
+      line.textContent = lines[index];
+      writeDone = 0;
+    } else {
+      let delay = 0;
+      text.forEach(ch => {
+        delay += 140 + Math.random() * 140; // a child's irregular pace, letter to letter
+        setTimeout(() => {
+          const span = document.createElement('span');
+          span.className = 'crayon-letter';
+          span.textContent = ch === ' ' ? ' ' : ch;
+          span.style.setProperty('--wobble', `${(Math.random() * 8 - 4).toFixed(1)}deg`);
+          line.appendChild(span);
+        }, delay);
+      });
+      writeDone = delay;
+    }
+
+    setTimeout(() => {
+      line.classList.add('crayon-fade-out');
+      setTimeout(() => writeLine(index + 1), FADE_MS);
+    }, writeDone + HOLD_MS);
+  }
+
+  writeLine(0);
+}
+
+function hideAscensionSplash() {
+  const splash = document.getElementById('ascension-splash');
+  if (!splash) return;
+  if (state._ascensionClick) {
+    splash.removeEventListener('click', state._ascensionClick);
+    state._ascensionClick = null;
+  }
+  if (state._ascensionHintTimer) {
+    clearTimeout(state._ascensionHintTimer);   // don't let a stray hint land on the NEXT cycle
+    state._ascensionHintTimer = null;
+  }
+  splash.classList.add('hidden');
+  splash.innerHTML = '';
+}
+
+/** Dismiss the ascension splash and reignite the cycle. */
+function ackAscension() {
+  if (!state.awaitingAscensionAck) return;
+  state.awaitingAscensionAck = false;
+  hideAscensionSplash();
+  rebirthRun();
+}
+
+// The rebirth: resume the SAME score/credit lineage in fresh starting conditions. Everything
+// else (upgrades, inventory, keybindings, keyboard expansion, clean-play gates, efficiency,
+// cosmetics) resets — a true new cycle. No checkpoint is taken until the next break room.
+function rebirthRun() {
+  const keepScore   = state.score;
+  const keepCredits = state.credits;
+
+  resetRunState({ keepScoreCredits: true });
+  state.ascensionCount++;        // this lineage has now collapsed one more cycle
+
+  hideTutorial();
+  hideGameOverSplash();
+  hideAscensionSplash();
+  clearScreenGlitch();
+  clearCracks();
+
+  const container = document.getElementById('game-container');
+  container.classList.remove('consequences', 'whiteout', 'dying', 'in-break',
+                             'glitch-active', 'glitch-severe');
+
+  resetTheme();   // cosmetics reset with the cycle
+
+  const overlay = document.getElementById('overlay');
+  overlay.classList.add('hidden');
+  overlay.classList.remove('blackout');
+  document.getElementById('phase-label').textContent = 'ACTIVE SEQUENCE';
+  document.getElementById('rebind-hint').classList.add('hidden');
+  document.getElementById('break-room').classList.add('hidden');
+  document.getElementById('freq-legend').classList.add('hidden');
+  document.getElementById('input-echo').textContent = '';
+
+  clearLog();
+  addToLog('THE CYCLE COLLAPSES. ALL IS ONE. ALL BEGINS AGAIN.', 'log-info');
+  addToLog(`CYCLE ${state.ascensionCount}: THE TALLY PERSISTS — ${keepScore} SEQUENCES, ${keepCredits} CR.`, 'log-info');
+  addToLog('THE MACHINE AWAITS YOUR INPUT. AS IT ALWAYS HAS.', 'log-info');
+
+  startTimer();    // a brand-new set begins on a full countdown
+  nextSequence();  // load the first sequence (renders everything, incl. cleared cracks)
 }
 
 // ============================================================
@@ -1918,9 +2509,9 @@ const TUTORIAL_STEPS = {
     body:   'Spend compliance credits on consumables and permanent upgrades, grouped by type. More of the catalog is authorised the longer you play without errors.',
   },
   consumables: {
-    target: '#inventory-bar',
+    target: '#reserved-row',
     title:  'CONSUMABLES',
-    body:   'Items you bought appear here. Trigger them during play with the matching number-row key (1–9).',
+    body:   'Items you bought claim a slot here, with their charge count. Trigger them during play with the matching number-row key (1–9), or click the slot.',
   },
   numpad: {
     target: '#bindings-grid',
@@ -2142,6 +2733,13 @@ document.addEventListener('keydown', e => {
     return;
   }
 
+  // The RETURNING EMPLOYEE splash swallows the next keypress to dismiss it.
+  if (state.awaitingReturningAck) {
+    e.preventDefault();
+    ackReturning();
+    return;
+  }
+
   // A tutorial tip captures all input: ENTER/SPACE dismiss it, everything else
   // is swallowed so the player can't act on a panel they're still being shown.
   if (state.tutorialActive) {
@@ -2156,6 +2754,18 @@ document.addEventListener('keydown', e => {
   if (state.awaitingGameOverAck) {
     e.preventDefault();
     ackGameOver();
+    return;
+  }
+
+  // The shatter cinematic swallows all input; the held ascension splash then
+  // reignites the cycle on any key.
+  if (state.ascending && !state.awaitingAscensionAck) {
+    e.preventDefault();
+    return;
+  }
+  if (state.awaitingAscensionAck) {
+    e.preventDefault();
+    ackAscension();
     return;
   }
 

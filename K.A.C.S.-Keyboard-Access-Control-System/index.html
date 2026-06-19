@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KEYBOARD CONTROL | THE MACHINE</title>
-  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
 
@@ -27,6 +27,8 @@
         <span id="header-stats">
           SEQUENCES:&nbsp;<span id="score-num">0</span>
           &nbsp;|&nbsp;
+          STREAK:&nbsp;<span id="streak-num">0</span>
+          &nbsp;|&nbsp;
           CREDITS:&nbsp;<span id="credits-num">0</span>
           &nbsp;|&nbsp;
           EFFICIENCY:&nbsp;<span id="efficiency-num">--%</span>
@@ -38,62 +40,65 @@
       </div>
     </header>
 
-    <!-- SEQUENCE PANEL ──────────────────────────────── -->
-    <section id="sequence-panel">
-      <div class="panel-label">
-        <span id="phase-label">ACTIVE SEQUENCE</span>
-      </div>
-      <div id="sequence-display"></div>
-      <div id="progress-track"><div id="progress-fill"></div></div>
-      <div id="rebind-hint" class="hidden">
-        CLICK A KEY — THEN CLICK ANOTHER KEY TO SWAP THEIR COMMANDS &nbsp;|&nbsp;
-        PRESS <kbd>ENTER</kbd> TO CONFIRM EARLY
-      </div>
-      <!-- Break-room expansion choice (REVEAL vs BLIND); populated by game.js -->
-      <div id="expansion-choice" class="hidden"></div>
-    </section>
+    <!-- CONTENT SCROLL ── everything between the header and input bar scrolls
+         as one column, so the header and input bar stay pinned in place. -->
+    <div id="content-scroll">
 
-    <!-- MIDDLE ROW ── timer + machine log ───────────── -->
-    <div id="middle-row">
+      <!-- SEQUENCE PANEL ──────────────────────────────── -->
+      <section id="sequence-panel">
+        <div class="panel-label">
+          <span id="phase-label">ACTIVE SEQUENCE</span>
+        </div>
+        <div id="sequence-display"></div>
+        <div id="progress-track"><div id="progress-fill"></div></div>
+        <div id="rebind-hint" class="hidden">
+          CLICK A KEY — THEN CLICK ANOTHER KEY TO SWAP THEIR COMMANDS &nbsp;|&nbsp;
+          PRESS <kbd>ENTER</kbd> TO CONFIRM EARLY
+        </div>
+        <!-- Break-room expansion choice (REVEAL vs BLIND); populated by game.js -->
+        <div id="expansion-choice" class="hidden"></div>
+      </section>
 
-      <!-- TIMER -->
-      <div id="timer-panel">
-        <div class="panel-label">TIME REMAINING</div>
-        <div id="timer-number">033</div>
-        <div id="timer-track"><div id="timer-fill"></div></div>
-      </div>
+      <!-- MIDDLE ROW ── timer + machine log ───────────── -->
+      <div id="middle-row">
 
-      <!-- MACHINE LOG -->
-      <div id="log-panel">
-        <div class="panel-label">MACHINE STATUS</div>
-        <div id="machine-log"></div>
-      </div>
+        <!-- TIMER -->
+        <div id="timer-panel">
+          <div class="panel-label">TIME REMAINING</div>
+          <div id="timer-number">033</div>
+          <div id="timer-track"><div id="timer-fill"></div></div>
+        </div>
 
-    </div><!-- /middle-row -->
+        <!-- MACHINE LOG -->
+        <div id="log-panel">
+          <div class="panel-label">MACHINE STATUS</div>
+          <div id="machine-log"></div>
+        </div>
 
-    <!-- KEY BINDINGS PANEL ──────────────────────────── -->
-    <section id="bindings-panel">
-      <div class="panel-label">KEY BINDINGS
-        <span id="freq-legend" class="hidden">
-          &nbsp;— frequency:
-          <span class="freq-high">■ HIGH</span>
-          <span class="freq-med">■ MED</span>
-          <span class="freq-low">■ LOW</span>
-        </span>
-      </div>
-      <div id="bindings-grid"></div>
-    </section>
+      </div><!-- /middle-row -->
 
-    <!-- BREAK ROOM ── REQUISITION shop (shown in break room) ── -->
-    <section id="break-room" class="hidden">
-      <div class="panel-label">REQUISITION &nbsp;—&nbsp; SPEND COMPLIANCE CREDITS &nbsp;|&nbsp;
-        PRESS <kbd>ENTER</kbd> TO RETURN TO SERVICE
-      </div>
-      <div id="shop-grid"></div>
-    </section>
+      <!-- KEY BINDINGS PANEL ──────────────────────────── -->
+      <section id="bindings-panel">
+        <div class="panel-label">KEY BINDINGS
+          <span id="freq-legend" class="hidden">
+            &nbsp;— frequency:
+            <span class="freq-high">■ HIGH</span>
+            <span class="freq-med">■ MED</span>
+            <span class="freq-low">■ LOW</span>
+          </span>
+        </div>
+        <div id="bindings-grid"></div>
+      </section>
 
-    <!-- INVENTORY BAR ── consumables usable during play ─── -->
-    <div id="inventory-bar" class="hidden"></div>
+      <!-- BREAK ROOM ── REQUISITION shop (shown in break room) ── -->
+      <section id="break-room" class="hidden">
+        <div class="panel-label">REQUISITION &nbsp;—&nbsp; SPEND COMPLIANCE CREDITS &nbsp;|&nbsp;
+          PRESS <kbd>ENTER</kbd> TO RETURN TO SERVICE
+        </div>
+        <div id="shop-grid"></div>
+      </section>
+
+    </div><!-- /content-scroll -->
 
     <!-- INPUT ECHO ──────────────────────────────────── -->
     <div id="input-panel">
@@ -106,11 +111,20 @@
   <!-- Screen-tearing glitch overlay (intensifies as the timer dies); shown by game.js -->
   <div id="glitch-overlay" class="hidden"></div>
 
+  <!-- Containment-breach crack overlay (fractures grow with clean sets; SVG injected by game.js) -->
+  <div id="crack-overlay" class="hidden" aria-hidden="true"></div>
+
   <!-- CRT scanline overlay -->
   <div id="scanlines"></div>
 
   <!-- Held GAME OVER splash (dim + flickering M); waits for click/keypress, populated by game.js -->
   <div id="gameover-splash" class="hidden"></div>
+
+  <!-- Held ASCENSION splash (white → void after the shatter); waits for click/keypress, populated by game.js -->
+  <div id="ascension-splash" class="hidden"></div>
+
+  <!-- Held RETURNING EMPLOYEE splash (shown on resume from a saved break-room checkpoint); waits for click/keypress, populated by game.js -->
+  <div id="returning-splash" class="hidden"></div>
 
   <!-- Spotlight tutorial overlay (dim + highlight box + tooltip); populated by game.js -->
   <div id="tutorial-overlay" class="hidden"></div>
@@ -118,6 +132,6 @@
   <!-- Reset-save confirmation modal; populated by game.js -->
   <div id="reset-confirm" class="hidden"></div>
 
-  <script src="game.js?v=6"></script>
+  <script src="game.js?v=10"></script>
 </body>
 </html>
