@@ -24,7 +24,7 @@ That is all. You have one job.
 
 Should the timer reach zero:
 
-Do not allow the timre to reach zero.
+Do not allow the timer to reach zero.
 
 We, The Organization©™®, are not obligated to disclose any potential hazards to your person.
 Therefore it is an employees sole responsibilty to maintain and persist the primary function
