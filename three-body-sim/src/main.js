@@ -17,6 +17,7 @@ const BASE_DT = 0.05;       // step size at quality = 1
 const TIME_SCALE = 15;      // simulation-seconds per real second at speed = 1
 const TRAIL_SAMPLE = 0.12;  // simulation-time between trail samples
 const MAX_STEPS_PER_FRAME = 2000; // guard against the spiral of death
+const WHITE = new THREE.Color(0xffffff);
 
 const container = document.getElementById('scene');
 const scene = new SimScene(container);
@@ -30,13 +31,14 @@ const app = {
   scene,
   system,
   options: scene.options,
-  state: { running: false, speed: 1, substeps: 5, G: 1, softening: 0.4, trailLength: 700, presetId: 'default' },
+  state: { running: false, speed: 1, substeps: 5, G: 1, softening: 0.4, trailLength: 700, presetId: 'default', collisionMode: 'off', restitution: 0.5 },
   // seeded from the default preset; the UI edits these in place
   custom: { bodies: presets.default.build().bodies.map(cloneCfg) },
 
   _initial: [],
   _accum: 0,
   _lastTrail: 0,
+  _lastImpact: null,
   selectedIndex: -1,
 
   // ---- loading / resetting ----
@@ -49,6 +51,7 @@ const app = {
     scene.buildBodies(system);
     scene.clearTrails();
     this._initial = system.snapshot();
+    this._lastImpact = null;
     this.state.presetId = id;
     this._resetClocks();
     this.state.running = autoplay;
@@ -83,6 +86,8 @@ const app = {
     this.setSpeed(cfg.speed);
     this.setSubsteps(cfg.substeps);
     this.setTrailLength(cfg.trailLength);
+    this.setCollisionMode(cfg.collisionMode);
+    this.setRestitution(cfg.restitution);
 
     this.custom.bodies = bodies.map(cloneCfg);
     // literal setup — no momentum zeroing / recentre — so positions are exactly
@@ -91,6 +96,7 @@ const app = {
     scene.buildBodies(system);
     scene.clearTrails();
     this._initial = system.snapshot();
+    this._lastImpact = null;
     this.state.presetId = 'custom';
     this._resetClocks();
     this.state.running = false;
@@ -160,6 +166,8 @@ const app = {
     system.initialEnergy = system.totalEnergy();
     this._initial = system.snapshot();
     scene.clearTrails();
+    scene.clearEffects();
+    this._lastImpact = null;
     this._resetClocks();
     this.state.running = false;
   },
@@ -167,6 +175,8 @@ const app = {
   reset() {
     system.restore(this._initial);
     scene.clearTrails();
+    scene.clearEffects();
+    this._lastImpact = null;
     this._resetClocks();
     this.state.running = false;
   },
@@ -191,6 +201,22 @@ const app = {
   setG(v) { this.state.G = v; system.G = v; system.initialEnergy = system.totalEnergy(); },
   setSoftening(v) { this.state.softening = v; system.softening = v; system.initialEnergy = system.totalEnergy(); },
   setTrailLength(v) { this.state.trailLength = v; scene.setTrailLength(v); },
+  setCollisionMode(m) { this.state.collisionMode = m; system.collisionMode = m; ui.setCollisionMode(m); },
+  setRestitution(v) { this.state.restitution = v; system.restitution = v; },
+  cycleCollisionMode() {
+    const order = ['off', 'merge', 'bounce'];
+    const i = order.indexOf(this.state.collisionMode);
+    this.setCollisionMode(order[(i + 1) % order.length]);
+  },
+
+  // Turn an impact event from the physics into a burst + a UI report entry. The
+  // blast colour blends the two bodies, shifting white-hot as severity climbs.
+  _onCollision(ev) {
+    const col = new THREE.Color(ev.aColor).lerp(new THREE.Color(ev.bColor), 0.5);
+    if (ev.severity >= 1) col.lerp(WHITE, Math.min(0.8, 0.2 + ev.severity / 20));
+    scene.spawnImpact(ev.point, { severity: ev.severity, color: col });
+    this._lastImpact = ev;
+  },
 
   setOption(name, val) {
     scene.options[name] = val;
@@ -222,6 +248,8 @@ const app = {
       minSep: system.minSeparation(),
       speeds: system.bodies.map((b) => b.vel.length()),
       ejected: system.bodies.map((b) => b.ejected),
+      collisionMode: this.state.collisionMode,
+      lastImpact: this._lastImpact,
     };
   },
 
@@ -229,6 +257,12 @@ const app = {
 };
 
 const ui = createUI(app);
+
+// Route physics impacts to the controller, and seed the system with the current
+// collision settings (these persist across preset loads — setBodies leaves them).
+system.onCollision = (ev) => app._onCollision(ev);
+system.collisionMode = app.state.collisionMode;
+system.restitution = app.state.restitution;
 
 // ---- click-to-select bodies (distinguish a click from an orbit drag) ----
 {
@@ -281,4 +315,5 @@ window.addEventListener('resize', () => scene.resize());
 // boot
 app.loadPreset('default', { autoplay: true });
 ui.syncToggles();
+ui.setCollisionMode(app.state.collisionMode);
 frame();

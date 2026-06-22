@@ -37,11 +37,19 @@ const RANGES = {
   speed: [0.05, 4],
   substeps: [1, 16],
   trailLength: [0, 2000],
+  restitution: [0, 1],
   mass: [0.1, 12],
   radius: [0.4, 6],
   pos: [-40, 40],
   vel: [-1.5, 1.5],
 };
+
+const COLLISION_MODES = ['off', 'merge', 'bounce'];
+
+// Accept only a known collision-mode string; anything else falls back to 'off'.
+function parseMode(value) {
+  return COLLISION_MODES.includes(value) ? value : 'off';
+}
 
 /** A validation failure carrying a short, user-facing message. */
 export class SetupError extends Error {
@@ -125,6 +133,8 @@ export function serializeSetup(app) {
     speed: tidy(app.state.speed),
     substeps: app.state.substeps,
     trailLength: app.state.trailLength,
+    collisionMode: app.state.collisionMode,
+    restitution: tidy(app.state.restitution),
     bodies,
   };
 
@@ -138,7 +148,8 @@ export function serializeSetup(app) {
  * three) is required.
  * @param {string} text
  * @returns {{G:number, softening:number, speed:number, substeps:number,
- *            trailLength:number, bodies:Array<object>}}
+ *            trailLength:number, collisionMode:string, restitution:number,
+ *            bodies:Array<object>}}
  */
 export function parseSetup(text) {
   if (typeof text !== 'string') throw new SetupError('That does not look like a text file.');
@@ -182,6 +193,8 @@ export function parseSetup(text) {
     speed: num(raw.speed, RANGES.speed, 1),
     substeps: Math.round(num(raw.substeps, RANGES.substeps, 5)),
     trailLength: Math.round(num(raw.trailLength, RANGES.trailLength, 700)),
+    collisionMode: parseMode(raw.collisionMode),
+    restitution: num(raw.restitution, RANGES.restitution, 0.5),
     bodies,
   };
 }

@@ -100,6 +100,14 @@ function setupTooltips() {
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 
+// Impact-severity colours, matching the phosphor palette: calm green up to an
+// alarming red.
+const CLASS_COLOR = {
+  merge: '#4dff88',
+  disruption: '#ffc24d',
+  catastrophic: '#ff6b6b',
+};
+
 // Trigger a client-side download of `text` as a file. Pure DOM + Blob: the data
 // never leaves the browser, so there is no network/upload surface.
 function downloadText(text, filename) {
@@ -143,7 +151,7 @@ export function createUI(app) {
     el('div', { class: 'brand' }, [
       el('span', { class: 'brand-mark', text: '◤◢' }),
       el('span', { text: 'THREE-BODY SIM' }),
-      el('span', { class: 'brand-ver', text: 'v1.0' }),
+      el('span', { class: 'brand-ver', text: 'v1.27' }),
     ]),
     el('div', { class: 'topstats' }, [statusPill, fpsEl, timeEl, helpBtn])
   );
@@ -162,6 +170,8 @@ export function createUI(app) {
       <span class="k">N</span><span>random</span>
       <span class="k">F</span><span>frame all</span>
       <span class="k">T / G / V</span><span>trails / grid / velocity</span>
+      <span class="k">Z</span><span>z-height lines</span>
+      <span class="k">C</span><span>cycle collisions</span>
       <span class="k">ESC</span><span>deselect</span>
     ` }),
   ]);
@@ -275,11 +285,11 @@ export function createUI(app) {
     else if (e.key === 'Escape') { e.preventDefault(); hideExportForm(); }
   });
 
-  const exportBtn = button('⭳ EXPORT', () => showExportForm(), '', 'Save the current bodies and parameters to a text file');
-  const importBtn = button('⭱ IMPORT', () => fileInput.click(), '', 'Load a setup from a previously exported text file');
+  const exportBtn = button('⭱ EXPORT', () => showExportForm(), '', 'Save the current bodies and parameters to a text file');
+  const importBtn = button('⭳ IMPORT', () => fileInput.click(), '', 'Load a setup from a previously exported text file');
 
   panel.appendChild(section('SAVE / LOAD',
-    el('div', { class: 'btn-grid' }, [exportBtn, importBtn]),
+    el('div', { class: 'btn-grid' }, [importBtn, exportBtn]),
     exportForm,
     fileInput,
     ioStatus,
@@ -335,6 +345,42 @@ export function createUI(app) {
   const trailS = slider('trail', { min: 0, max: 2000, step: 50, value: app.state.trailLength, format: (v) => (v | 0) + '', tip: 'Length of the fading orbital trail behind each body (number of points). 0 = off.' }, (v) => app.setTrailLength(v));
   panel.appendChild(section('PARAMETERS', speedS.row, qualS.row, gravS.row, softS.row, trailS.row));
 
+  // ---------- collisions ----------
+  // Mode selector (OFF / MERGE / BOUNCE) + restitution, plus a live report of the
+  // most recent impact: who hit whom, how fast, and how violent versus the
+  // bodies' own gravitational binding energy.
+  const collModeBtns = {};
+  const collModeDefs = [
+    ['off', 'OFF', 'Bodies pass straight through each other — pure point-mass gravity'],
+    ['merge', 'MERGE', 'On contact, bodies coalesce into one. Momentum and mass conserved.'],
+    ['bounce', 'BOUNCE', 'On contact, bodies rebound as solid spheres (see restitution).'],
+  ];
+  const collModeRow = el('div', { class: 'btn-grid three' });
+  for (const [id, label, tip] of collModeDefs) {
+    const b = button(label, () => app.setCollisionMode(id), '', tip);
+    collModeBtns[id] = b;
+    collModeRow.appendChild(b);
+  }
+  const restS = slider('restitution', { min: 0, max: 1, step: 0.05, value: app.state.restitution, tip: 'Bounciness in BOUNCE mode: 0 = fully inelastic (sticky), 1 = perfectly elastic. Below 1 the impact bleeds off energy.' }, (v) => app.setRestitution(v));
+
+  const impClass = el('span', { class: 'ro-val', text: '—' });
+  const impPair = el('span', { class: 'ro-val', text: '—' });
+  const impSpeed = el('span', { class: 'ro-val', text: '—' });
+  const impEnergy = el('span', { class: 'ro-val', text: '—' });
+  const impSeverity = el('span', { class: 'ro-val', text: '—' });
+  panel.appendChild(section('COLLISIONS',
+    collModeRow,
+    restS.row,
+    el('div', { class: 'ro-sub', text: 'last impact' }),
+    el('div', { class: 'ro-grid' }, [
+      el('span', { class: 'ro-label', text: 'class', 'data-tip': 'Impact severity: MERGE (would gently accrete), DISRUPTION (a violent graze), or CATASTROPHIC (a body-shattering smash).' }), impClass,
+      el('span', { class: 'ro-label', text: 'bodies', 'data-tip': 'The two bodies involved in the most recent impact.' }), impPair,
+      el('span', { class: 'ro-label', text: 'rel speed', 'data-tip': 'Relative speed of the two bodies at the moment of contact.' }), impSpeed,
+      el('span', { class: 'ro-label', text: 'impact E', 'data-tip': 'Kinetic energy of the relative motion at contact (½·μ·v²) — the energy available to do damage.' }), impEnergy,
+      el('span', { class: 'ro-label', text: 'vs binding', 'data-tip': 'Impact energy as a multiple of the merged body’s gravitational binding energy. Above ~1 it can disrupt; above ~10 it shatters.' }), impSeverity,
+    ])
+  ));
+
   // ---------- display ----------
   const o = app.options;
   const toggleInputs = {};
@@ -350,6 +396,7 @@ export function createUI(app) {
         tgl('center-of-mass', 'showCOM', "Show/hide the blue crosshair at the system's center of mass"),
         tgl('trails', 'showTrails', 'Show/hide the fading orbital trails (T)'),
         tgl('velocity', 'showVectors', "Show/hide arrows for each body's velocity — direction & speed (V)"),
+        tgl('z-height', 'showZLines', 'Show/hide vertical drop lines from each body to the xy plane — reveals height above/below the grid (Z)'),
       ])
     )
   );
@@ -413,6 +460,8 @@ export function createUI(app) {
       case 't': app.toggleOption('showTrails'); break;
       case 'g': app.toggleOption('showGrid'); break;
       case 'v': app.toggleOption('showVectors'); break;
+      case 'z': app.toggleOption('showZLines'); break;
+      case 'c': app.cycleCollisionMode(); break;
       case 'escape': app.deselect(); popover.classList.add('hidden'); break;
     }
   });
@@ -422,6 +471,9 @@ export function createUI(app) {
   return {
     setActivePreset(id) {
       for (const [k, b] of Object.entries(presetBtns)) b.classList.toggle('active', k === id);
+    },
+    setCollisionMode(m) {
+      for (const [k, b] of Object.entries(collModeBtns)) b.classList.toggle('active', k === m);
     },
     showBodyEditor(i, cfg) {
       editIndex = i;
@@ -443,6 +495,7 @@ export function createUI(app) {
       trailS.set(app.state.trailLength);
       speedS.set(app.state.speed);
       qualS.set(app.state.substeps);
+      restS.set(app.state.restitution);
     },
     syncToggles() {
       for (const [k, input] of Object.entries(toggleInputs)) input.checked = !!app.options[k];
@@ -465,6 +518,20 @@ export function createUI(app) {
         const sp = r.speeds[i] ?? 0;
         bodyBars[i].fill.style.width = Math.min(100, (sp / maxSpeed) * 100) + '%';
         bodyBars[i].val.textContent = r.ejected[i] ? 'EJECT' : sp.toFixed(2);
+      }
+
+      const li = r.lastImpact;
+      if (li) {
+        impClass.textContent = li.category.toUpperCase();
+        impClass.style.color = CLASS_COLOR[li.category] || '';
+        impPair.textContent = `${li.a} ✕ ${li.b}`;
+        impSpeed.textContent = li.vRel.toFixed(2);
+        impEnergy.textContent = li.impactEnergy.toFixed(2);
+        impSeverity.textContent = Number.isFinite(li.severity) ? li.severity.toFixed(2) + '×' : '∞';
+      } else {
+        impClass.textContent = impPair.textContent = '—';
+        impSpeed.textContent = impEnergy.textContent = impSeverity.textContent = '—';
+        impClass.style.color = '';
       }
     },
   };

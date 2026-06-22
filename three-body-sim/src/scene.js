@@ -11,6 +11,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ImpactFX } from './effects.js';
 
 const GRID_CELL = 10;
 const TRAIL_CAPACITY = 4000; // max points buffered per trail
@@ -54,12 +55,16 @@ export class SimScene {
 
     this._buildComposer();
 
+    // collision pyrotechnics (cosmetic; reads nothing back into the physics)
+    this.fx = new ImpactFX(this.scene);
+
     // option state mirrored by the UI
     this.options = {
       showGrid: true,
       showCOM: true,
       showTrails: true,
       showVectors: false,
+      showZLines: true,
       followCOM: false,
       trackCOM: false,
     };
@@ -130,12 +135,25 @@ export class SimScene {
     this.composer.addPass(new OutputPass());
   }
 
+  // ---- collision effects ----
+
+  /** Fire a cosmetic impact burst at `point`. opts: { severity, color }. */
+  spawnImpact(point, opts) {
+    this.fx.spawn(point, opts);
+  }
+
+  /** Snuff out any in-flight bursts (reset / config change). */
+  clearEffects() {
+    this.fx.clear();
+  }
+
   /** (Re)create the per-body visuals to match the current system bodies. */
   buildBodies(system) {
     for (const v of this.bodyVisuals) this._disposeVisual(v);
     for (const a of this.arrows) this.arrowGroup.remove(a);
     this.bodyVisuals = [];
     this.arrows = [];
+    this.fx.clear();
     this.setSelected(-1);
 
     for (const body of system.bodies) {
@@ -172,19 +190,38 @@ export class SimScene {
       this.arrowGroup.add(arrow);
       this.arrows.push(arrow);
 
-      this.scene.add(mesh, trail);
-      this.bodyVisuals.push({ body, mesh, trail, color, points: [] });
+      // z-height drop line: a dashed plumb line from the body straight down to
+      // its shadow on the xy plane (z = 0), so height off the grid is readable.
+      const zGeo = new THREE.BufferGeometry();
+      zGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const zline = new THREE.Line(
+        zGeo,
+        new THREE.LineDashedMaterial({
+          color: color.getHex(),
+          transparent: true,
+          opacity: 0.5,
+          dashSize: 1.4,
+          gapSize: 1,
+          depthWrite: false,
+        })
+      );
+      zline.frustumCulled = false;
+
+      this.scene.add(mesh, trail, zline);
+      this.bodyVisuals.push({ body, mesh, trail, zline, color, points: [] });
     }
 
     this.arrowGroup.visible = this.options.showVectors;
   }
 
   _disposeVisual(v) {
-    this.scene.remove(v.mesh, v.trail);
+    this.scene.remove(v.mesh, v.trail, v.zline);
     v.mesh.geometry.dispose();
     v.mesh.material.dispose();
     v.trail.geometry.dispose();
     v.trail.material.dispose();
+    v.zline.geometry.dispose();
+    v.zline.material.dispose();
   }
 
   // ---- picking / selection ----
@@ -267,6 +304,18 @@ export class SimScene {
         v.mesh.rotation.x += 0.004;
         v.mesh.rotation.y += 0.006;
       }
+
+      // drop line from the body down to its projection on the xy plane
+      const zl = v.zline;
+      zl.visible = visible && this.options.showZLines;
+      if (zl.visible) {
+        const p = zl.geometry.attributes.position.array;
+        p[0] = v.body.pos.x; p[1] = v.body.pos.y; p[2] = v.body.pos.z;
+        p[3] = v.body.pos.x; p[4] = v.body.pos.y; p[5] = 0;
+        zl.geometry.attributes.position.needsUpdate = true;
+        zl.computeLineDistances(); // keep dashes uniform as the height changes
+      }
+
       this._updateTrailGeometry(v);
     }
 
@@ -394,6 +443,7 @@ export class SimScene {
     }
 
     this._updateGrid();
+    this.fx.update();
     this.controls.update();
     this.composer.render();
   }

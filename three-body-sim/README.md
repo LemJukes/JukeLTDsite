@@ -19,14 +19,16 @@ via an import map, plain ES modules, no install and no build step.
 - **Click-to-edit bodies** — click any body (or CUSTOM) to select it and tune its mass, size,
   position (x/y/z) and velocity (x/y/z); the edit becomes the new starting state.
 - **Orbital trails** that fade behind each body — the signature view of the chaotic dance.
+- **Collisions & impact bursts** — optionally let close bodies merge, with a cosmetic phosphor
+  burst on contact.
 - **Live telemetry** — total energy, energy-drift %, centre-of-mass offset, per-body speed.
 - **3D camera** — orbit (drag), zoom (scroll), pan (right-drag); auto-frame; plus two
-  centre-of-mass camera modes that work alone or together: **follow** (stay put, keep aiming
-  at the COM) and **track** (travel with the COM at a locked distance — a dolly shot).
+  centre-of-mass modes that work alone or together: **follow** (stay put, keep aiming at the
+  COM) and **track** (travel with the COM at a locked distance — a dolly shot).
 - **Save / load setups** — export the current bodies and parameters to a small JSON text file
-  and import it back. Imports are fully validated and sanitised before they touch the sim.
+  and import it back; imports are fully validated and sanitised before they touch the sim.
 - **CRT terminal aesthetic** — early-CG low-poly wireframe bodies, a phosphor glow (bloom),
-  scanlines, and a blue centre-of-mass crosshair on a faint infinite grid.
+  scanlines, dashed z-height drop lines, and a blue centre-of-mass crosshair on a faint grid.
 
 ## Run it locally
 
@@ -43,30 +45,11 @@ npx serve -l 8080
 
 Then open <http://localhost:8080>.
 
-## Controls
-
-| Action             | Mouse / UI                  | Key |
-|--------------------|-----------------------------|-----|
-| Play / pause       | START / PAUSE               | `Space` |
-| Single step        | STEP                        | `S` |
-| Reset to start     | RESET                       | `R` |
-| New random system  | RANDOM                      | `N` |
-| Frame all bodies   | FRAME ALL                   | `F` |
-| Select / edit body | click a body, or CUSTOM     |     |
-| Deselect           |                             | `Esc` |
-| Toggle trails      | trails                      | `T` |
-| Toggle grid        | grid                        | `G` |
-| Toggle velocity    | velocity                    | `V` |
-| Orbit / zoom / pan | drag / scroll / right-drag  |     |
-
-**Parameters:** `speed` (time scale), `quality` (integration sub-steps), `gravity G`,
-`softening`, and `trail` length.
-
 ## Host it on your site
 
 No build, no install — these are plain static files that use only relative paths (Three.js
-comes from a CDN via the import map), so the folder works at any URL. Just copy this whole
-folder onto your site and link to it:
+comes from a CDN via the import map), so the folder works at any URL. Copy this whole folder
+into your site and link to it:
 
 ```
 your-site/
@@ -77,8 +60,30 @@ your-site/
 ```
 
 It will be live at `https://your-site.com/three-body-sim/`. Rename the folder to anything you
-like — nothing depends on the name. (On GitHub Pages it works the same way: drop the folder in
-and visit `https://<user>.github.io/<repo>/three-body-sim/`.)
+like — nothing depends on the name. One caveat: don't paste a copy that still contains its own
+hidden `.git` folder, or Git treats it as a nested repository and won't commit the contents —
+this folder is already clean of that.
+
+## Controls
+
+| Action                | Mouse / UI                  | Key |
+|-----------------------|-----------------------------|-----|
+| Play / pause          | START / PAUSE               | `Space` |
+| Single step           | STEP                        | `S` |
+| Reset to start        | RESET                       | `R` |
+| New random system     | RANDOM                      | `N` |
+| Frame all bodies      | FRAME ALL                   | `F` |
+| Select / edit body    | click a body, or CUSTOM     |     |
+| Deselect              |                             | `Esc` |
+| Toggle trails         | trails                      | `T` |
+| Toggle grid           | grid                        | `G` |
+| Toggle velocity       | velocity                    | `V` |
+| Toggle z-height lines | z-height                    | `Z` |
+| Cycle collisions      | collisions                  | `C` |
+| Orbit / zoom / pan    | drag / scroll / right-drag  |     |
+
+**Parameters:** `speed` (time scale), `quality` (integration sub-steps), `gravity G`,
+`softening`, and `trail` length.
 
 ## Project layout
 
@@ -92,6 +97,7 @@ src/
   scene.js        Three.js scene, bodies, trails, grid, picking, bloom post-processing
   ui.js           CRT terminal control panel and telemetry
   io.js           export / import of setups, with validation + sanitisation
+  effects.js      cosmetic collision / impact bursts
 ```
 
 ## A note on units
