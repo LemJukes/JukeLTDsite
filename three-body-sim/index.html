@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three-Body Simulator</title>
+  <meta name="description" content="An interactive three-body gravity simulator with real N-body physics and a CRT terminal aesthetic." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Buildless modern Three.js via import map (no install / no bundler). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <header id="topbar"></header>
+
+  <aside id="panel" aria-label="simulator controls"></aside>
+
+  <button id="panel-toggle" type="button" title="toggle controls" aria-label="toggle controls">CTRL</button>
+
+  <script type="module" src="src/main.js"></script>
+  <script>
+    // panel show/hide (small screens or distraction-free viewing)
+    const pt = document.getElementById('panel-toggle');
+    pt.addEventListener('click', () => document.body.classList.toggle('panel-hidden'));
+  </script>
+</body>
+</html>
