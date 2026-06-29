@@ -817,8 +817,19 @@ function renderKeyBindings() {
     showNextTutorial();
   }
 
-  // Main keyboard (always drawn).
-  KEYBOARD_LAYOUT.forEach(row => addRow(row));
+  // Main keyboard (always drawn). The three rows live inside a .keys-main
+  // wrapper so the narrow-screen layout can collapse them into one continuous
+  // orthographic grid (.key-row → display:contents) while the wide layout keeps
+  // them as stacked rows.
+  const mainWrap = document.createElement('div');
+  mainWrap.className = 'keys-main';
+  KEYBOARD_LAYOUT.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'key-row';
+    row.forEach(code => rowEl.appendChild(makeCell(code)));
+    mainWrap.appendChild(rowEl);
+  });
+  grid.appendChild(mainWrap);
 
   // Numpad bonus cluster — only once it has begun unlocking.
   if (numpadUnlocked()) {
@@ -1504,6 +1515,7 @@ function startGame() {
   document.getElementById('phase-label').textContent = 'ACTIVE SEQUENCE';
   document.getElementById('game-container').classList.remove('in-break');
   document.getElementById('rebind-hint').classList.add('hidden');
+  document.getElementById('return-to-service-btn').classList.add('hidden');
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
@@ -1624,10 +1636,18 @@ function handleKeyInput(code) {
   }
 }
 
+// True when the primary input is touch (phone/tablet with no hovering pointer).
+// Re-checked at click time so hybrid devices adapt if their input mode changes.
+function isTouchPrimary() {
+  return window.matchMedia('(pointer: coarse) and (hover: none)').matches;
+}
+
 // ── Mouse-click key entry (costs a small credit fee to favour the keyboard) ──
+// On touch devices tapping is the ONLY way to play, so the fee is waived there.
 function handleKeyClick(code) {
   if (state.phase !== 'PLAYING') return;
-  state.credits = Math.max(0, Math.round((state.credits - CLICK_FEE_PER_KEY) * 10) / 10);
+  const fee = isTouchPrimary() ? 0 : CLICK_FEE_PER_KEY;
+  state.credits = Math.max(0, Math.round((state.credits - fee) * 10) / 10);
   updateScoreDisplay();
   handleKeyInput(code);
 }
@@ -1768,6 +1788,7 @@ function sequenceError() {
 function renderBreakRoomScreen() {
   document.getElementById('phase-label').textContent = 'BREAK ROOM';
   document.getElementById('rebind-hint').classList.remove('hidden');
+  document.getElementById('return-to-service-btn').classList.remove('hidden');
   document.getElementById('freq-legend').classList.remove('hidden');
   // REQUISITION only appears once it has come online; the two-column break-room
   // layout (rebind keys beside the shop) is only used while the shop is shown.
@@ -1875,6 +1896,7 @@ function leaveBreakRoom() {
   document.getElementById('phase-label').textContent = 'ACTIVE SEQUENCE';
   document.getElementById('game-container').classList.remove('in-break');
   document.getElementById('rebind-hint').classList.add('hidden');
+  document.getElementById('return-to-service-btn').classList.add('hidden');
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
   document.getElementById('expansion-choice').classList.add('hidden');
@@ -2821,6 +2843,10 @@ document.addEventListener('DOMContentLoaded', () => {
   renderKeyBindings();
   document.getElementById('highscore-num').textContent = loadHighScore();
   initResetButton();
+
+  // Tap-to-exit the break room (mirrors pressing ENTER) — static element, wired once.
+  document.getElementById('return-to-service-btn')
+    .addEventListener('click', () => { if (state.phase === 'BREAK_ROOM') leaveBreakRoom(); });
 
   // Resume from the last break-room checkpoint if one survived; else fresh start.
   const saved = loadCheckpoint();

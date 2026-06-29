@@ -35,6 +35,20 @@ html, body {
   font-size: 14px;
   line-height: 1.4;
   -webkit-font-smoothing: none;
+  -webkit-tap-highlight-color: transparent;   /* no blue tap-flash on mobile */
+}
+
+/* Tappable controls: skip the 300ms double-tap delay and block pinch/double-tap
+   zoom so rapid play taps register instantly. */
+.key-cell,
+.shop-card,
+.exp-btn,
+.overlay-btn,
+.reset-modal-btn,
+.tut-tooltip-btn,
+.reset-save-btn,
+#return-to-service-btn {
+  touch-action: manipulation;
 }
 
 /* ── CRT Scanlines Overlay ─────────────────────────────────── */
@@ -217,6 +231,31 @@ html, body {
   text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
 }
 
+/* Clickable break-room exit — mirrors pressing ENTER, so touch players aren't
+   stranded in the break room. */
+#return-to-service-btn {
+  display: block;
+  margin: 8px auto 0;
+  padding: 8px 28px;
+  border: 1px solid var(--cyan);
+  background: transparent;
+  color: var(--cyan);
+  font-family: var(--font);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+#return-to-service-btn:hover,
+#return-to-service-btn:focus {
+  background: rgba(0, 229, 255, 0.1);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
+  outline: none;
+}
+
 /* ── MIDDLE ROW (timer + log) ──────────────────────────────── */
 #middle-row {
   display: grid;
@@ -397,6 +436,15 @@ html, body {
   flex-direction: column;
   gap: 4px;
   margin-top: 2px;
+}
+
+/* Wrapper around the three main keyboard rows. Wide layout: a transparent
+   vertical stack (identical to the rows living directly in the grid). Narrow
+   layout collapses it into one continuous orthographic grid (see media query). */
+.keys-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .key-row {
@@ -1609,6 +1657,74 @@ html, body {
 /* ── Responsive adjustment ─────────────────────────────────── */
 @media (max-height: 650px) {
   #timer-number { font-size: 32px; }
+}
+
+/* ── Narrow / portrait screens — orthographic "grouped blocks" keyboard ──────
+   On thin windows and phones held vertically the staggered QWERTY rows give way
+   to column-aligned grids of larger keys that fill the width. The number row and
+   the letter block share an auto-fill column count (same container width + same
+   track sizing ⇒ identical columns) so they line up orthographically; the numpad
+   keeps its recognizable 4-wide calculator cluster. Locked keys still render, so
+   the grid shape stays stable as the pool unlocks. */
+@media (max-width: 600px) {
+  /* Header: let title + stats + reset button wrap instead of overflowing. */
+  #header {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 5px 8px;
+  }
+  #header-stats { font-size: 10px; }
+  #header-right { gap: 6px; }
+
+  /* Timer column shrinks so the timer+log pair stays comfortable down to ~320px. */
+  #middle-row { grid-template-columns: minmax(92px, 118px) 1fr; }
+
+  /* Let the whole column scroll instead of squeezing panels to fit. A squeezed
+     panel (notably the taller break-room sequence panel) would otherwise be
+     crushed to its min-height while its content keeps its size, bleeding out
+     under the panel below it. The machine log keeps its own bounded scroll so
+     it can't push the keyboard off-screen. */
+  #content-scroll > * { flex-shrink: 0; }
+  #machine-log { max-height: 30vh; }
+
+  /* Letter keys: one continuous orthographic grid (rows dissolve into it). */
+  .keys-main {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 5px;
+  }
+  .keys-main .key-row { display: contents; }
+
+  /* Number row aligns to the same columns as the letter block above the keys. */
+  .key-row.reserved-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 5px;
+    margin-bottom: 5px;
+  }
+
+  /* Numpad keeps its 4-wide calculator shape. */
+  .key-row.numpad-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+  }
+
+  /* Bigger keys / touch targets; cells stretch to fill their grid track. */
+  .key-cell,
+  .key-row.reserved-row .key-cell,
+  .key-row.numpad-row .key-cell {
+    min-width: 0;
+    min-height: 52px;
+    padding: 6px 4px;
+  }
+  .key-label { font-size: 17px; }
+  .key-cmd {
+    font-size: 9px;
+    max-width: 100%;
+  }
+  .key-cell.reserved .key-cmd   { font-size: 8px; }
+  .key-cell.reserved .key-count { font-size: 9px; }
 }
 
 /* Reduced motion: drop the breach's heavy animations. The cracks still appear and
