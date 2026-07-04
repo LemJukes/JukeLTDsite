@@ -106,6 +106,12 @@ html, body {
   scrollbar-color: var(--green-dark) transparent;
 }
 
+/* Panels keep their natural height and the column scrolls — never squeeze a
+   child below its content (which would bleed one panel under the next). This is
+   a vertical-space rule, so it applies at every viewport width, not just narrow
+   ones; the column always scrolls instead of overlapping. */
+#content-scroll > * { flex-shrink: 0; }
+
 #content-scroll::-webkit-scrollbar { width: 4px; }
 #content-scroll::-webkit-scrollbar-track { background: transparent; }
 #content-scroll::-webkit-scrollbar-thumb { background: var(--green-dark); }
@@ -350,6 +356,10 @@ html, body {
 
 #machine-log {
   flex: 1;
+  /* Bounded at every viewport so streamed log lines scroll inside the panel
+     instead of growing #middle-row — which would push the keyboard down and
+     reflow anything measured against it (e.g. the spotlight highlight box). */
+  max-height: clamp(120px, 28vh, 360px);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -1603,8 +1613,14 @@ html, body {
   border: 2px solid var(--cyan);
   border-radius: 4px;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.82), 0 0 18px var(--green-glow);
-  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
   pointer-events: none;
+}
+
+/* The transition is added only after the first placement, so the box appears
+   exactly on its target rather than sliding in from the corner; once positioned
+   it animates smoothly as it tracks layout reflow. */
+.tut-highlight.positioned {
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
 }
 
 .tut-tooltip {
@@ -1625,6 +1641,49 @@ html, body {
   letter-spacing: 0.08em;
   text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
   margin-bottom: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   REPETITIVE STRAIN — header meter, debt, and the numeric purge
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Header strain readout: calm green by default, amber as it mounts, red once a purge is due. */
+#strain-num.strain-warn {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(255, 183, 0, 0.5);
+}
+#strain-num.strain-high {
+  color: var(--red);
+  text-shadow: 0 0 10px rgba(255, 51, 51, 0.7);
+  animation: flicker 0.5s ease-in-out infinite alternate;
+}
+
+/* Credits in the red, literally, once the balance goes negative. */
+#credits-num.credits-debt {
+  color: var(--red);
+  text-shadow: 0 0 10px rgba(255, 51, 51, 0.7);
+}
+
+/* During a purge the sequence progress bar becomes the depleting compliance timer:
+   crisp linear depletion, amber → red as it empties. */
+#progress-fill.purge-bar {
+  background: var(--amber);
+  box-shadow: 0 0 8px rgba(255, 183, 0, 0.6);
+  transition: width 0.1s linear;
+}
+#progress-fill.purge-bar.purge-bar-low {
+  background: var(--red);
+  box-shadow: 0 0 10px rgba(255, 51, 51, 0.8);
+}
+
+/* Purge digit string reuses the .seq-cmd look (active/done/pending), a touch more spaced. */
+.purge-digit { letter-spacing: 0.06em; }
+
+/* The live numpad keys during a purge read a little hotter than a normal clickable cell. */
+.key-cell.purge-key .key-cmd {
+  color: var(--amber);
+  font-size: 15px;
+  font-weight: bold;
 }
 
 .tut-tooltip-body {
@@ -1679,12 +1738,9 @@ html, body {
   /* Timer column shrinks so the timer+log pair stays comfortable down to ~320px. */
   #middle-row { grid-template-columns: minmax(92px, 118px) 1fr; }
 
-  /* Let the whole column scroll instead of squeezing panels to fit. A squeezed
-     panel (notably the taller break-room sequence panel) would otherwise be
-     crushed to its min-height while its content keeps its size, bleeding out
-     under the panel below it. The machine log keeps its own bounded scroll so
-     it can't push the keyboard off-screen. */
-  #content-scroll > * { flex-shrink: 0; }
+  /* The "scroll, don't squeeze" guard (#content-scroll > * { flex-shrink: 0 })
+     now lives in the base layout so it holds at every width. On phones, give the
+     machine log a slightly tighter cap so it can't crowd the larger touch keys. */
   #machine-log { max-height: 30vh; }
 
   /* Letter keys: one continuous orthographic grid (rows dissolve into it). */

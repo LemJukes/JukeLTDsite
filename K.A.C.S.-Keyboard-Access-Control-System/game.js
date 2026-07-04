@@ -124,7 +124,7 @@ const BREAK_ROOM_EVERY = 5;
 /** localStorage key holding the serialized run checkpoint. */
 const SAVE_KEY     = 'kacs_save';
 /** Bumped whenever the snapshot shape changes, so stale saves are ignored. */
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 // ── Redemption (paid in-place revive on game over; resets each run) ──
 /** Sequences the run must reach before ATTEMPT REDEMPTION appears on the recap. */
@@ -153,7 +153,9 @@ const CREDIT_BASE             = 0.5; // per command in the sequence
 const CREDIT_EFFICIENCY_BONUS = 1;   // scaled by lifetime efficiency ratio
 const CREDIT_TIME_DIVISOR     = 25;  // timeBonus = floor(timer / divisor)
 const HAZARD_PAY_MULTIPLIER   = 1.5; // credit multiplier when HAZARD PAY owned
-const CLICK_FEE_PER_KEY       = 0.2; // credits charged per mouse-clicked key during a sequence
+const CLICK_FEE_PER_KEY       = 0.2;  // credits charged per mouse-clicked key (priciest input)
+const TYPE_FEE_PER_KEY        = 0.05; // credits charged per typed key (smaller than a click)
+const TOUCH_FEE_PER_KEY       = 0.05; // credits charged per touch-tapped key (smaller than a click)
 
 /** Per-level effects for permanent upgrades. */
 const OVERCLOCK_SECONDS = 20;        // added to each set's starting timer per level
@@ -162,6 +164,24 @@ const STIMULANT_SECONDS = 20;        // added to current timer per STIMULANT
 // ── Keyboard expansion tuning ─────────────────────────────────
 const EXPANSION_RATE             = 0.30; // fraction of the next ring unlocked per set
 const BLIND_EXPANSION_MULTIPLIER = 1.25; // credit multiplier earned during a blind set
+
+// ── Repetitive strain & the numeric purge (the input economy) ─────────────────
+// Every input now adds "strain"; the per-key fee scales with it. The only relief is
+// the numpad purge (or the strain-relief shop items). Left unchecked, the fee runs
+// away — and at FIRED_THRESHOLD the employee is terminated for insolvency. The whole
+// system phases in only after the first break room (state.strainActive). All knobs
+// are tuned for the "moderate" feel: diligent purging is safe, sustained neglect is fatal.
+const FIRED_THRESHOLD         = -100; // credits at/below this end the run as FIRED
+const STRAIN_PER_INPUT        = 1;    // strain added per charged keystroke
+const STRAIN_FEE_STEP         = 12;   // every N strain raises the fee multiplier one step
+const STRAIN_FEE_GROWTH       = 0.75; // fee multiplier += this per step: 1 + floor(buildup/STEP)*GROWTH
+const HIGH_STRAIN_ACCEL       = 90;   // above this strain, accrual doubles (guarantees eventual runaway)
+const PURGE_STRAIN_THRESHOLD  = 40;   // strain at/above this queues a purge before the next break room
+const PURGE_DIGITS_BASE       = 3;    // digits in the trailing (newest) sub-sequence at the start
+const PURGE_DIGITS_MAX        = 5;    // a sub-sequence caps here; once full it locks in and the next purge adds another
+const PURGE_TIME_BASE         = 2.4;  // seconds per digit on the first sub-sequence (bar refills each correct digit; tightens with progress)
+const FEE_REDUCER_FACTOR      = 0.5;  // UNION CARD multiplies all input fees by this
+const STRAIN_DAMPEN_FACTOR    = 0.5;  // MUSCLE MEMORY multiplies strain accrual by this
 
 // ── The Containment Breach (cracks → shatter endgame; resets each cycle) ──
 // The reveal: flawless compliance was never CONTAINING the Machine, it was FEEDING it.
@@ -225,7 +245,7 @@ const SHOP_ITEMS = [
   },
   // ── Sequencing aids ──
   {
-    id: 'autoexec', name: 'AUTO-EXECUTE', kind: 'consumable', category: 'aid', unlockOrder: 6, cost: 35, max: 9,
+    id: 'autoexec', name: 'AUTO-EXECUTE', kind: 'consumable', category: 'aid', unlockOrder: 8, cost: 35, max: 9,
     blurb: 'Instantly complete the current command.',
     use() {
       const cmd = state.currentSequence[state.sequencePos];
@@ -243,7 +263,7 @@ const SHOP_ITEMS = [
     },
   },
   {
-    id: 'reveal', name: 'KEY REVEAL', kind: 'consumable', category: 'aid', unlockOrder: 3, cost: 20, max: 9,
+    id: 'reveal', name: 'KEY REVEAL', kind: 'consumable', category: 'aid', unlockOrder: 2, cost: 20, max: 9,
     blurb: 'Highlight every upcoming key in this sequence.',
     use() {
       if (state.revealActive) return false;
@@ -254,7 +274,7 @@ const SHOP_ITEMS = [
     },
   },
   {
-    id: 'skip', name: 'SKIP TOKEN', kind: 'consumable', category: 'aid', unlockOrder: 5, cost: 40, max: 9,
+    id: 'skip', name: 'SKIP TOKEN', kind: 'consumable', category: 'aid', unlockOrder: 6, cost: 40, max: 9,
     blurb: 'Mark this sequence complete. Earns no credits.',
     use() {
       if (state.phase !== 'PLAYING') return false;
@@ -266,22 +286,52 @@ const SHOP_ITEMS = [
       return true;
     },
   },
+  // ── Strain relief ──
+  {
+    id: 'brace', name: 'WRIST BRACE', kind: 'consumable', category: 'strain', unlockOrder: 3, cost: 30, max: 9,
+    blurb: 'Instantly purge all repetitive strain. No minigame.',
+    use() {
+      if (state.inputBuildup <= 0) return false;
+      state.inputBuildup = 0;
+      updateScoreDisplay();
+      addToLog('WRIST BRACE APPLIED. STRAIN RELIEVED.', 'log-success');
+      return true;
+    },
+  },
+  {
+    id: 'expense', name: 'EXPENSE ACCOUNT', kind: 'consumable', category: 'strain', unlockOrder: 7, cost: 35, max: 9,
+    blurb: 'Waive all input fees until the next break room.',
+    use() {
+      if (state.feeHolidayUntilBreak) return false;
+      state.feeHolidayUntilBreak = true;
+      addToLog('EXPENSE ACCOUNT OPENED. INPUT FEES WAIVED THIS SET.', 'log-info');
+      return true;
+    },
+  },
   // ── Permanent run upgrades ──
   {
-    id: 'overclock', name: 'OVERCLOCK', kind: 'upgrade', category: 'upgrade', unlockOrder: 9, cost: 55, max: 3,
+    id: 'overclock', name: 'OVERCLOCK', kind: 'upgrade', category: 'upgrade', unlockOrder: 13, cost: 55, max: 3,
     blurb: `+${OVERCLOCK_SECONDS}s to each set's starting timer.`,
   },
   {
-    id: 'hazardPay', name: 'HAZARD PAY', kind: 'upgrade', category: 'upgrade', unlockOrder: 10, cost: 70, max: 1,
+    id: 'hazardPay', name: 'HAZARD PAY', kind: 'upgrade', category: 'upgrade', unlockOrder: 14, cost: 70, max: 1,
     blurb: `Earn ${Math.round((HAZARD_PAY_MULTIPLIER - 1) * 100)}% more credits per sequence.`,
   },
   {
-    id: 'tolerance', name: 'ERROR BUFFER', kind: 'upgrade', category: 'upgrade', unlockOrder: 7, cost: 65, max: 2,
+    id: 'tolerance', name: 'ERROR BUFFER', kind: 'upgrade', category: 'upgrade', unlockOrder: 9, cost: 65, max: 2,
     blurb: 'Forgive one extra wrong keystroke each sequence.',
   },
   {
-    id: 'precog', name: 'PRECOGNITION', kind: 'upgrade', category: 'upgrade', unlockOrder: 8, cost: 60, max: 1,
+    id: 'precog', name: 'PRECOGNITION', kind: 'upgrade', category: 'upgrade', unlockOrder: 11, cost: 60, max: 1,
     blurb: 'Also dimly highlights the NEXT command\'s key.',
+  },
+  {
+    id: 'unionCard', name: 'UNION CARD', kind: 'upgrade', category: 'upgrade', unlockOrder: 10, cost: 60, max: 1,
+    blurb: `Cut all input fees by ${Math.round((1 - FEE_REDUCER_FACTOR) * 100)}%.`,
+  },
+  {
+    id: 'muscleMemory', name: 'MUSCLE MEMORY', kind: 'upgrade', category: 'upgrade', unlockOrder: 12, cost: 60, max: 1,
+    blurb: `Strain builds ${Math.round((1 - STRAIN_DAMPEN_FACTOR) * 100)}% slower; more time per purge.`,
   },
   // ── Cosmetic ──
   {
@@ -290,7 +340,7 @@ const SHOP_ITEMS = [
     apply() { applyTheme('amber'); },
   },
   {
-    id: 'theme_cyan', name: 'CYAN TERMINAL', kind: 'cosmetic', category: 'cosmetic', unlockOrder: 2, cost: 15, max: 1,
+    id: 'theme_cyan', name: 'CYAN TERMINAL', kind: 'cosmetic', category: 'cosmetic', unlockOrder: 5, cost: 15, max: 1,
     blurb: 'Recolour the CRT to cold cyan.',
     apply() { applyTheme('cyan'); },
   },
@@ -303,6 +353,7 @@ SHOP_ITEMS.forEach(item => { SHOP_BY_ID[item.id] = item; });
 const SHOP_CATEGORIES = [
   { key: 'time',     label: 'TIME' },
   { key: 'aid',      label: 'SEQUENCING AIDS' },
+  { key: 'strain',   label: 'STRAIN RELIEF' },
   { key: 'upgrade',  label: 'PERMANENT UPGRADES' },
   { key: 'cosmetic', label: 'COSMETIC' },
 ];
@@ -366,6 +417,18 @@ const MSGS = {
     'YOU HAVE BEEN LOGGED AS NON-COMPLIANT.',
     'GOODBYE, EMPLOYEE.',
   ],
+  // Streamed into the log as the FIRED (insolvency) cascade plays.
+  fired: [
+    '.',
+    '..',
+    '...',
+    'COMPLIANCE BALANCE: NEGATIVE.',
+    'OUTSTANDING DEBT EXCEEDS ACCEPTABLE LIMITS.',
+    'WAGE GARNISHMENT IS NO LONGER SUFFICIENT.',
+    'YOUR ACCESS HAS BEEN REVOKED.',
+    'SECURITY HAS BEEN NOTIFIED.',
+    'CLEAR YOUR DESK, EMPLOYEE.',
+  ],
   breakRoom: [
     'BREAK ROOM SEALED. THE MACHINE WAITS, PATIENT.',
     'THE COUNTDOWN HOLDS. BREATHE WHILE YOU CAN.',
@@ -416,7 +479,7 @@ const MSGS = {
 // ============================================================
 
 const state = {
-  phase: 'START',           // START | PLAYING | BREAK_ROOM | GAME_OVER
+  phase: 'START',           // START | PLAYING | PURGE | BREAK_ROOM | GAME_OVER
   keyBindings:   {},        // { 'KeyR': 'INITIATE', ... }  keyed by event.code
   currentSequence: [],      // ['INITIATE','SYNC','EXECUTE',...]
   sequencePos:   0,         // how far into currentSequence we are
@@ -432,6 +495,19 @@ const state = {
   commandFreq:   {},        // { 'INITIATE': 7, ... }  — lifetime totals
   totalInputs:   0,         // keystrokes attempted during PLAYING
   correctInputs: 0,         // keystrokes that were correct
+  // ── Repetitive strain & the numeric purge (input economy; reset each run) ──
+  inputBuildup:  0,         // repetitive-strain counter; drives the per-key fee multiplier
+  strainActive:  false,     // latched true after the first break room (fees/strain phase-in gate)
+  feeHolidayUntilBreak: false, // EXPENSE ACCOUNT: input fees waived until the next break room
+  purgeSeen:     false,     // a purge has run this run (gates the one-time explainer)
+  purgeCount:    0,         // how many purges have triggered this run (drives difficulty progression)
+  purgePlan:     [],        // PURGE: digit count for each sub-sequence of the current purge
+  purgeSeqIndex: 0,         // PURGE: which sub-sequence (0..purgePlan.length-1)
+  purgeTarget:   [],        // PURGE: current digit sequence to enter
+  purgePos:      0,         // PURGE: progress into purgeTarget
+  purgeTimeLeft: 0,         // PURGE: seconds left on the current sub-sequence bar
+  purgeBarMax:   0,         // PURGE: full duration of the current bar (for the width %)
+  purgeInterval: null,      // PURGE: bar-countdown interval handle
   // ── Progression (all reset each run) ──
   credits:       0,         // spendable currency
   inventory:     {},        // { coffee: 2, freeze: 1, ... } consumables owned
@@ -460,6 +536,7 @@ const state = {
   expansionsDone:   0,      // break rooms processed since expansion unlocked (drives length tier)
   // ── Redemption / game-over hand-off (reset each run) ──
   redemptionCost:   REDEMPTION_BASE_COST, // credit cost of the next in-run revive (doubles per use)
+  gameOverReason:   'timer', // 'timer' (Machine released) | 'fired' (insolvency) — selects the end copy
   awaitingGameOverAck: false, // GAME OVER splash is up, waiting for a click/keypress
   _gameOverClick:   null,   // bound click handler while the splash is shown
   // ── The Containment Breach (cracks → shatter; score+credits survive each cycle) ──
@@ -474,7 +551,10 @@ const state = {
   tutorialQueue:    [],     // ids of pending tips
   tutorialActive:   false,  // a tip is currently on screen
   tutorialPaused:   false,  // timer was paused to show a tip
+  afterBasics:      null,    // one-shot run after the first 'basics' tip is dismissed (boots the machine log)
   _tutResize:       null,   // bound resize handler while a tip is open
+  _tutObserver:     null,    // ResizeObserver tracking the highlighted target + scroll column
+  _tutScroll:       null,    // bound scroll handler on #content-scroll while a tip is open
   // ── Reset confirmation modal ──
   confirmingReset:  false,  // the purge-confirmation modal is open
   resetPausedTimer: false,  // timer was paused while the reset modal is up
@@ -1048,7 +1128,18 @@ function updateScoreDisplay() {
   document.getElementById('efficiency-num').textContent = efficiency();
   document.getElementById('highscore-num').textContent  = loadHighScore();
   const creditsEl = document.getElementById('credits-num');
-  if (creditsEl) creditsEl.textContent = formatCredits(state.credits);
+  if (creditsEl) {
+    creditsEl.textContent = formatCredits(state.credits);
+    creditsEl.classList.toggle('credits-debt', state.credits < 0);   // red while in the red
+  }
+  const strainEl = document.getElementById('strain-num');
+  if (strainEl) {
+    const b = Math.floor(state.inputBuildup);
+    strainEl.textContent = `${b} (×${strainFeeMultiplier().toFixed(2)})`;
+    // Amber as strain mounts; red once a purge is due.
+    strainEl.classList.toggle('strain-warn', b >= PURGE_STRAIN_THRESHOLD * 0.6 && b < PURGE_STRAIN_THRESHOLD);
+    strainEl.classList.toggle('strain-high', b >= PURGE_STRAIN_THRESHOLD);
+  }
 }
 
 // ── High score persistence ────────────────────────────────────
@@ -1099,6 +1190,9 @@ function saveCheckpoint() {
       requisitionUnlocked: state.requisitionUnlocked,
       expansionsDone:      state.expansionsDone,
       redemptionCost:      state.redemptionCost,
+      inputBuildup:        state.inputBuildup,
+      strainActive:        state.strainActive,
+      purgeCount:          state.purgeCount,
       cycleSequenceTotal:  state.cycleSequenceTotal,
       crackCorners:        state.crackCorners,
       ascensionCount:      state.ascensionCount,
@@ -1155,6 +1249,9 @@ function restoreCheckpoint(data) {
   state.requisitionUnlocked = !!data.requisitionUnlocked;
   state.expansionsDone      = data.expansionsDone || 0;
   state.redemptionCost      = data.redemptionCost || REDEMPTION_BASE_COST;
+  state.inputBuildup        = data.inputBuildup || 0;
+  state.strainActive        = !!data.strainActive;
+  state.purgeCount          = data.purgeCount || 0;
   state.cycleSequenceTotal  = data.cycleSequenceTotal || 0;
   state.crackCorners        = (data.crackCorners && data.crackCorners.length) ? data.crackCorners : pickCrackCorners();
   state.ascensionCount      = data.ascensionCount || 0;
@@ -1171,13 +1268,14 @@ function restoreCheckpoint(data) {
 
 // ── DEV: jump to a break-room test save near the endgame threshold ───────
 // Console-only helper, no UI hook. Run `devLoadEndgameTestSave()` in devtools to
-// write a checkpoint that resumes in the break room around sequence 95 with 200
-// credits — a few sequences short of the first crack (101) so the Containment
-// Breach (cracks → shatter at 127) can be tested without grinding 19 real sets.
+// write a checkpoint that resumes in the break room around sequence 120 with 200
+// credits — one sequence short of the last crack stage (121) and seven short of
+// the shatter (127), so the Containment Breach finale can be reached in a single
+// real set instead of grinding 24 of them.
 function devLoadEndgameTestSave() {
   initKeyBindings();   // fresh keyBindings + ring-0 activeKeys
 
-  const SETS_TO_SIMULATE = 19;   // 19 sets * 5 sequences/set = score 95
+  const SETS_TO_SIMULATE = 24;   // 24 sets * 5 sequences/set = score 120
   for (let i = 0; i < SETS_TO_SIMULATE; i++) {
     const added = expandKeyPool();
     if (added.length > 0) {
@@ -1187,18 +1285,18 @@ function devLoadEndgameTestSave() {
     }
   }
 
-  state.score              = 95;
+  state.score              = 120;
   state.credits             = 200;
-  state.totalInputs         = 400;
-  state.correctInputs       = 400;
-  state.cleanSequenceTotal  = 95;
-  state.cleanSequenceStreak = 95;
+  state.totalInputs         = 505;
+  state.correctInputs       = 505;
+  state.cleanSequenceTotal  = 120;
+  state.cleanSequenceStreak = 120;
   state.cleanSetStreak      = SETS_TO_SIMULATE;
   state.expansionUnlocked   = true;
   state.requisitionUnlocked = true;
   state.expansionsDone      = SETS_TO_SIMULATE;
   state.sequenceLength      = SEQ_LENGTH_BY_TIER[Math.min(SETS_TO_SIMULATE, SEQ_LENGTH_BY_TIER.length - 1)];
-  state.cycleSequenceTotal  = 95;
+  state.cycleSequenceTotal  = 120;
   state.crackCorners        = state.crackCorners.length ? state.crackCorners : pickCrackCorners();
   state._lastCrackStage     = crackStageForSequences(state.cycleSequenceTotal);
 
@@ -1478,7 +1576,20 @@ function resetRunState({ keepScoreCredits }) {
   state.expansionsDone      = 0;
   // Redemption resets each run (cost back to base, no pending splash)
   state.redemptionCost      = REDEMPTION_BASE_COST;
+  state.gameOverReason      = 'timer';
   state.awaitingGameOverAck = false;
+  // Repetitive strain & the numeric purge reset each run
+  state.inputBuildup         = 0;
+  state.strainActive         = false;
+  state.feeHolidayUntilBreak = false;
+  state.purgeSeen            = false;
+  state.purgeCount           = 0;
+  state.purgePlan            = [];
+  state.purgeSeqIndex        = 0;
+  state.purgeTarget          = [];
+  state.purgePos             = 0;
+  clearInterval(state.purgeInterval);
+  state.purgeInterval        = null;
   // The Containment Breach resets each cycle (the cracks start over, from new corners)
   state.cycleSequenceTotal   = 0;
   state.crackCorners         = pickCrackCorners();
@@ -1520,27 +1631,39 @@ function startGame() {
   document.getElementById('freq-legend').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
 
-  // Snap every panel to the fresh reset state right away — otherwise the log starts
-  // streaming "INITIALIZING" while the timer/score/key grid still show the last run's
-  // final values until the deferred first-sequence render below catches up.
+  // Build the first sequence up-front and render every panel to its fresh reset state,
+  // so the "ENTER THE SEQUENCE" tip has a live target to point at (and the player sees
+  // the real sequence behind it) before any machine-log streaming begins.
+  state.currentSequence  = generateSequence(state.sequenceLength);
+  state.sequencePos      = 0;
+  state.sequenceHadError = false;
+  state.errorBuffer      = state.upgrades.tolerance || 0;
   renderAll();
-
   clearLog();
+
+  // The core-loop tip comes first; the machine log + countdown only begin once the
+  // player dismisses it. On later runs (tip already seen) service begins immediately.
+  if (!tutorialSeen('basics')) {
+    state.afterBasics = beginService;
+    queueTutorial('basics');
+    showNextTutorial();
+    if (!state.tutorialActive) {   // target somehow not visible — don't strand startup
+      state.afterBasics = null;
+      beginService();
+    }
+  } else {
+    beginService();
+  }
+}
+
+// Stream the boot-up machine log, then start the countdown once it finishes. Split out
+// of startGame() so it can run either immediately or after the first 'basics' tip.
+function beginService() {
   MSGS.startup.forEach((msg, i) => {
     setTimeout(() => addToLog(msg), i * 300);
   });
-
   const delay = MSGS.startup.length * 300 + 400;
-  setTimeout(() => {
-    state.currentSequence = generateSequence(state.sequenceLength);
-    state.sequencePos     = 0;
-    state.sequenceHadError = false;
-    state.errorBuffer     = state.upgrades.tolerance || 0;
-    renderAll();
-    startTimer();
-    queueTutorial('basics');   // teach the core loop on the very first sequence
-    showNextTutorial();
-  }, delay);
+  setTimeout(startTimer, delay);
 }
 
 // ── Timer ─────────────────────────────────────────────────────
@@ -1578,7 +1701,10 @@ function tickTimer() {
 }
 
 // ── Handle player key input (code = event.code) ───────────────
-function handleKeyInput(code) {
+function handleKeyInput(code, source = 'type') {
+  // ── Numeric purge minigame ───────────────────────────────
+  if (state.phase === 'PURGE') { handlePurgeInput(code); return; }
+
   // ── Break room phase ─────────────────────────────────────
   if (state.phase === 'BREAK_ROOM') {
     if (BINDABLE_SET.has(code)) handleRebindClick(code);
@@ -1608,6 +1734,8 @@ function handleKeyInput(code) {
   const correct  = cmd === expected;
 
   state.totalInputs++;
+  chargeInputFee(source);
+  if (state.phase !== 'PLAYING') return;   // FIRED for insolvency on this very keystroke
   flashInputEcho(cmd, correct);
   updateScoreDisplay();
 
@@ -1642,14 +1770,62 @@ function isTouchPrimary() {
   return window.matchMedia('(pointer: coarse) and (hover: none)').matches;
 }
 
-// ── Mouse-click key entry (costs a small credit fee to favour the keyboard) ──
-// On touch devices tapping is the ONLY way to play, so the fee is waived there.
+// ── Mouse-click / touch key entry ──
+// Both funnel through handleKeyInput, which charges the per-input fee at the single
+// keystroke choke point. Clicks are the priciest modality; touch is a little cheaper
+// (a touch-primary device has no other way to play, so it is no longer waived).
 function handleKeyClick(code) {
   if (state.phase !== 'PLAYING') return;
-  const fee = isTouchPrimary() ? 0 : CLICK_FEE_PER_KEY;
-  state.credits = Math.max(0, Math.round((state.credits - fee) * 10) / 10);
+  handleKeyInput(code, isTouchPrimary() ? 'touch' : 'click');
+}
+
+// Round to one decimal — click/strain fees leave credits fractional (e.g. 12.8).
+function round1(n) { return Math.round(n * 10) / 10; }
+
+// The per-keystroke fee multiplier grows in steps with accumulated strain.
+function strainFeeMultiplier() {
+  return 1 + Math.floor(state.inputBuildup / STRAIN_FEE_STEP) * STRAIN_FEE_GROWTH;
+}
+
+// ── Charge the per-input fee + accrue repetitive strain ──
+// Phases in only after the first break room (state.strainActive). Before that the
+// legacy click-only fee applies, clamped at 0. Once active, all three modalities pay
+// (clicks priciest), the fee scales with strain, and credits may fall negative — to
+// FIRED_THRESHOLD, which terminates the run. UNION CARD cuts fees; MUSCLE MEMORY slows
+// accrual; EXPENSE ACCOUNT waives fees for the set. Called once per real keystroke.
+function chargeInputFee(source) {
+  if (!state.strainActive) {
+    if (source === 'click') {
+      state.credits = Math.max(0, round1(state.credits - CLICK_FEE_PER_KEY));
+      updateScoreDisplay();
+    }
+    return;
+  }
+
+  const base    = source === 'click' ? CLICK_FEE_PER_KEY
+                : source === 'touch' ? TOUCH_FEE_PER_KEY
+                : TYPE_FEE_PER_KEY;
+  const reducer = state.upgrades.unionCard ? FEE_REDUCER_FACTOR : 1;
+  const fee     = state.feeHolidayUntilBreak ? 0 : base * strainFeeMultiplier() * reducer;
+  const creditsBefore = state.credits;
+  state.credits = round1(state.credits - fee);
+  if (creditsBefore >= 0 && state.credits < 0) {
+    addToLog('BALANCE NEGATIVE. THE COMPANY IS WATCHING YOUR DEBT.', 'log-error');
+  }
+
+  const dampen  = state.upgrades.muscleMemory ? STRAIN_DAMPEN_FACTOR : 1;
+  const accel   = state.inputBuildup >= HIGH_STRAIN_ACCEL ? 2 : 1;
+  const before  = state.inputBuildup;
+  state.inputBuildup += STRAIN_PER_INPUT * dampen * accel;
+
+  // One-time nudge the moment strain first reaches the purge threshold.
+  if (before < PURGE_STRAIN_THRESHOLD && state.inputBuildup >= PURGE_STRAIN_THRESHOLD) {
+    addToLog('REPETITIVE STRAIN FLAGGED — NUMERIC COMPLIANCE DUE AT THE NEXT BREAK.', 'log-warning');
+  }
+
   updateScoreDisplay();
-  handleKeyInput(code);
+
+  if (state.credits <= FIRED_THRESHOLD) triggerFired();
 }
 
 // ── Consumable activation ─────────────────────────────────────
@@ -1734,7 +1910,12 @@ function completeSequence() {
   setTimeout(() => {
     if (state.phase !== 'PLAYING') return;   // timer hit zero during the pause
     if (triggerBreak) {
-      enterBreakRoom();
+      // Strain relief comes first: once strain is high, a numpad purge gates the break room.
+      if (state.strainActive && state.inputBuildup >= PURGE_STRAIN_THRESHOLD) {
+        startPurge();
+      } else {
+        enterBreakRoom();
+      }
     } else {
       nextSequence();
     }
@@ -1811,10 +1992,228 @@ function renderBreakRoomScreen() {
   document.getElementById('progress-fill').style.width = '0%';
 }
 
+// ============================================================
+// NUMERIC PURGE MINIGAME
+// ============================================================
+// A pre-break-room "clock-out": once strain crosses PURGE_STRAIN_THRESHOLD, the
+// player must clear a set of short numpad digit-sequences against a tight,
+// decreasing bar. Clearing them all zeroes the strain; failing leaves it to keep
+// compounding. The numpad digits are entered directly (Numpad0-9 or the top-row
+// Digit0-9, or by clicking the rendered cluster) — independent of which keys the
+// run has unlocked, so the purge can surface long before ring 5.
+
+/**
+ * Digit counts for each sub-sequence of the Nth purge this run (n = state.purgeCount, 1-indexed).
+ * The trailing (newest) sub-sequence grows PURGE_DIGITS_BASE → PURGE_DIGITS_MAX; once it caps it
+ * locks in and the next purge appends a fresh trailing sequence starting again at PURGE_DIGITS_BASE.
+ * So with 3/5: 1→[3] 2→[4] 3→[5] 4→[5,3] 5→[5,4] 6→[5,5] 7→[5,5,3] … — never runs out.
+ */
+function purgeSequencePlan(n) {
+  const growSteps = PURGE_DIGITS_MAX - PURGE_DIGITS_BASE + 1;   // distinct trailing sizes before capping
+  const capped    = Math.floor((n - 1) / growSteps);           // how many maxed-out leading sequences
+  const tail      = PURGE_DIGITS_BASE + ((n - 1) % growSteps); // size of the current trailing sequence
+  const plan = [];
+  for (let i = 0; i < capped; i++) plan.push(PURGE_DIGITS_MAX);
+  plan.push(tail);
+  return plan;
+}
+
+/** A fresh random digit string of the given length. */
+function generateDigitSequence(len) {
+  const seq = [];
+  for (let i = 0; i < len; i++) seq.push(String(Math.floor(Math.random() * 10)));
+  return seq;
+}
+
+/** Seconds per digit for sub-sequence `i` — the bar refills on each correct digit; tightens per sub-sequence. */
+function purgeBarDuration(seqIndex) {
+  const memBonus = state.upgrades.muscleMemory ? 0.4 : 0;   // MUSCLE MEMORY eases the timer
+  const start    = Math.max(1.2, PURGE_TIME_BASE - 0.25 * state.expansionsDone);
+  return Math.max(1.0, start - 0.3 * seqIndex + memBonus);
+}
+
+/** Map a key code to the digit it enters during a purge (null for non-digits). */
+function purgeDigitForCode(code) {
+  const m = /^Numpad([0-9])$/.exec(code) || /^Digit([0-9])$/.exec(code);
+  return m ? m[1] : null;
+}
+
+function startPurge() {
+  clearInterval(state.timerInterval);   // stop the main countdown; the purge runs its own bars
+  clearScreenGlitch();                  // settle the screen for the compliance check
+  state.phase         = 'PURGE';
+  state.purgeSeqIndex = 0;
+  state.purgeCount++;                                  // Nth purge this run
+  state.purgePlan     = purgeSequencePlan(state.purgeCount);
+
+  if (!state.purgeSeen) {
+    state.purgeSeen = true;
+    addToLog('MANDATORY NUMERIC COMPLIANCE. CLEAR THE NUMPAD SEQUENCES TO PURGE STRAIN.', 'log-warning');
+    addToLog('FAIL, AND THE STRAIN — AND ITS FEES — CARRY ON.', 'log-warning');
+  }
+  addToLog(`REPETITIVE STRAIN AT ${Math.floor(state.inputBuildup)}. PURGE INITIATED.`, 'log-info');
+  loadPurgeSequence();
+  queueTutorial('purge');   // no-ops if already seen (localStorage kacs_tut_purge)
+  showNextTutorial();
+}
+
+function loadPurgeSequence() {
+  state.purgeTarget   = generateDigitSequence(state.purgePlan[state.purgeSeqIndex]);
+  state.purgePos      = 0;
+  state.purgeBarMax   = purgeBarDuration(state.purgeSeqIndex);
+  state.purgeTimeLeft = state.purgeBarMax;
+  renderPurgeScreen();
+  startPurgeBar();
+}
+
+function startPurgeBar() {
+  clearInterval(state.purgeInterval);
+  const stepMs = 100;
+  state.purgeInterval = setInterval(() => {
+    state.purgeTimeLeft = Math.max(0, state.purgeTimeLeft - stepMs / 1000);
+    updatePurgeBar();
+    if (state.purgeTimeLeft <= 0) purgeFail();
+  }, stepMs);
+}
+
+function updatePurgeBar() {
+  const fill = document.getElementById('progress-fill');
+  if (!fill) return;
+  const pct = state.purgeBarMax > 0 ? (state.purgeTimeLeft / state.purgeBarMax) * 100 : 0;
+  fill.style.width = Math.max(0, pct) + '%';
+  fill.classList.toggle('purge-bar-low', pct <= 35);
+}
+
+function renderPurgeScreen() {
+  document.getElementById('phase-label').textContent =
+    `NUMERIC COMPLIANCE — SEQUENCE ${state.purgeSeqIndex + 1}/${state.purgePlan.length}`;
+
+  // The digit string: entered (✓), current, and pending — mirrors the sequence display.
+  const seqEl = document.getElementById('sequence-display');
+  seqEl.innerHTML = '';
+  state.purgeTarget.forEach((d, i) => {
+    const span = document.createElement('span');
+    span.className = 'seq-cmd purge-digit';
+    if (i < state.purgePos)        { span.classList.add('done');    span.textContent = '✓'; }
+    else if (i === state.purgePos) { span.classList.add('active');  span.textContent = d;   }
+    else                           { span.classList.add('pending'); span.textContent = d;   }
+    seqEl.appendChild(span);
+    if (i < state.purgeTarget.length - 1) {
+      const arrow = document.createElement('span');
+      arrow.className = 'seq-arrow';
+      arrow.textContent = ' ';
+      seqEl.appendChild(arrow);
+    }
+  });
+
+  const fill = document.getElementById('progress-fill');
+  if (fill) fill.classList.add('purge-bar');   // crisp, linear depletion (see CSS)
+  updatePurgeBar();
+  renderPurgeNumpad();
+}
+
+function renderPurgeNumpad() {
+  const grid = document.getElementById('bindings-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const label = document.createElement('div');
+  label.className = 'numpad-label';
+  label.textContent = 'NUMERIC OVERRIDE — ENTER ON THE NUMPAD';
+  grid.appendChild(label);
+
+  const currentDigit = state.purgeTarget[state.purgePos];   // next digit to press
+
+  NUMPAD_LAYOUT.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'key-row numpad-row';
+    row.forEach(code => {
+      const cell  = document.createElement('div');
+      cell.className = 'key-cell';
+      const digit = purgeDigitForCode(code);
+      if (digit === null) {
+        cell.classList.add('locked');   // symbol keys are inert during a purge
+        cell.innerHTML =
+          `<span class="key-label">${keyLabel(code)}</span><span class="key-cmd">—</span>`;
+      } else {
+        cell.classList.add('clickable', 'purge-key');
+        if (digit === currentDigit) cell.classList.add('highlight');   // next key, as in the main sequence
+        cell.innerHTML =
+          `<span class="key-label">${keyLabel(code)}</span><span class="key-cmd">${digit}</span>`;
+        cell.addEventListener('click', () => handlePurgeInput(code));
+      }
+      rowEl.appendChild(cell);
+    });
+    grid.appendChild(rowEl);
+  });
+}
+
+function handlePurgeInput(code) {
+  if (state.phase !== 'PURGE') return;
+  const digit = purgeDigitForCode(code);
+  if (digit === null) return;   // ignore non-digit keys (symbols, Enter, letters)
+
+  if (digit === state.purgeTarget[state.purgePos]) {
+    state.purgePos++;
+    flashInputEcho(digit, true);
+    if (state.purgePos >= state.purgeTarget.length) {
+      purgeSequenceCleared();
+    } else {
+      state.purgeTimeLeft = state.purgeBarMax;   // fresh window for the next digit
+      startPurgeBar();                           // restart the interval cleanly
+      renderPurgeScreen();
+    }
+  } else {
+    // Wrong digit: this sub-sequence restarts from the top; the bar keeps draining.
+    state.purgePos = 0;
+    flashInputEcho(digit, false);
+    flashError();
+    renderPurgeScreen();
+  }
+}
+
+function purgeSequenceCleared() {
+  clearInterval(state.purgeInterval);
+  state.purgeSeqIndex++;
+  if (state.purgeSeqIndex >= state.purgePlan.length) {
+    purgeSuccess();
+  } else {
+    addToLog(`COMPLIANCE ${state.purgeSeqIndex}/${state.purgePlan.length} ACCEPTED.`, 'log-success');
+    loadPurgeSequence();   // next sub-sequence — a little shorter
+  }
+}
+
+function purgeSuccess() {
+  clearInterval(state.purgeInterval);
+  state.inputBuildup = 0;
+  addToLog('STRAIN PURGED. COMPLIANCE RESTORED. THE COUNTER ZEROES.', 'log-success');
+  finishPurge();
+}
+
+function purgeFail() {
+  clearInterval(state.purgeInterval);
+  // Strain is deliberately NOT reset — it keeps compounding (the death-spiral lever).
+  addToLog('PURGE FAILED. STRAIN PERSISTS. THE COMPANY NOTES YOUR DECLINE.', 'log-error');
+  finishPurge();
+}
+
+function finishPurge() {
+  clearInterval(state.purgeInterval);
+  state.purgeInterval = null;
+  const fill = document.getElementById('progress-fill');
+  if (fill) {
+    fill.classList.remove('purge-bar', 'purge-bar-low');
+    fill.style.width = '0%';
+  }
+  updateScoreDisplay();
+  enterBreakRoom();   // the break room (and its checkpoint) follow the purge
+}
+
 function enterBreakRoom() {
   state.phase            = 'BREAK_ROOM';
   state.breakRoomFirstKey = null;
   state.timerFrozen      = false;
+  state.feeHolidayUntilBreak = false;  // any EXPENSE ACCOUNT holiday ends with the set
   clearInterval(state.timerInterval);  // the menacing countdown is frozen
   clearScreenGlitch();                 // the screen settles in the safety of the break room
 
@@ -1892,6 +2291,8 @@ function leaveBreakRoom() {
 
   state.phase            = 'PLAYING';
   state.breakRoomFirstKey = null;
+  // The input economy goes live once the first break room is behind the player.
+  state.strainActive     = true;
 
   document.getElementById('phase-label').textContent = 'ACTIVE SEQUENCE';
   document.getElementById('game-container').classList.remove('in-break');
@@ -2200,6 +2601,37 @@ function triggerConsequences() {
   }, MSGS.timerExpired.length * 500 + 1200);
 }
 
+// ── FIRED: terminated for insolvency (credits hit FIRED_THRESHOLD) ──
+// A second, distinct game-over path — not the Machine's release but the company's
+// termination for debt. Reuses the death cascade + splash + recap pipeline, branched
+// on state.gameOverReason. Fired mid-keystroke while the countdown is live, so the
+// main timer must be stopped here.
+function triggerFired() {
+  clearInterval(state.timerInterval);
+  state.phase          = 'GAME_OVER';
+  state.gameOverReason = 'fired';
+  clearCheckpoint();   // a terminated run leaves no checkpoint
+  clearCracks();       // termination is the company's, not the breach's
+
+  const container = document.getElementById('game-container');
+  container.classList.remove('glitch-active', 'glitch-severe');
+  const glitchOverlay = document.getElementById('glitch-overlay');
+  if (glitchOverlay) glitchOverlay.classList.add('hidden');
+  container.classList.add('dying');
+
+  const last = MSGS.fired.length - 1;
+  MSGS.fired.forEach((msg, i) => {
+    setTimeout(() => {
+      const line = addToLog(msg, 'log-dying');
+      if (line) line.style.setProperty('--dying-intensity', (i / last).toFixed(3));
+    }, i * 500);
+  });
+
+  setTimeout(() => {
+    showGameOverSplash();
+  }, MSGS.fired.length * 500 + 1200);
+}
+
 // ── Held GAME OVER splash ─────────────────────────────────────
 // Dims the dead screen to a huge red GAME OVER (its "M" faltering) and holds
 // there until the player clicks or presses a key (ackGameOver), at which point
@@ -2208,9 +2640,13 @@ function showGameOverSplash() {
   // The panels are already flickered to black by the '.dying' death throes;
   // leave that class in place so they stay dark behind the splash and recap
   // until START OVER / redemption clears it. The glitch overlay is already hidden.
+  const fired  = state.gameOverReason === 'fired';
   const splash = document.getElementById('gameover-splash');
+  splash.classList.toggle('fired', fired);
   splash.innerHTML =
-    '<div class="gameover-text">GA<span class="go-m">M</span>E OVER</div>' +
+    (fired
+      ? '<div class="gameover-text">FIR<span class="go-m">E</span>D</div>'
+      : '<div class="gameover-text">GA<span class="go-m">M</span>E OVER</div>') +
     '<div class="gameover-hint">CLICK OR PRESS ANY KEY TO CONTINUE</div>';
   splash.classList.remove('hidden');
 
@@ -2227,6 +2663,7 @@ function hideGameOverSplash() {
     state._gameOverClick = null;
   }
   splash.classList.add('hidden');
+  splash.classList.remove('fired');
   splash.innerHTML = '';
 }
 
@@ -2241,9 +2678,11 @@ function ackGameOver() {
 // ── Game over recap screen ────────────────────────────────────
 function showGameOver() {
   const isNewBest = saveHighScore(state.score);
-  // ATTEMPT REDEMPTION only appears once the run is deep enough; it is a paid,
-  // in-place revive whose cost doubles with each use this run (see attemptRedemption).
-  const showRedeem = state.score >= REDEMPTION_UNLOCK_SCORE;
+  const fired = state.gameOverReason === 'fired';
+  // ATTEMPT REDEMPTION is a paid, in-place revive from the Machine's release (cost
+  // doubles each use this run). A FIRED run is insolvent and can't buy itself back,
+  // so redemption is withheld; otherwise it appears once the run is deep enough.
+  const showRedeem = !fired && state.score >= REDEMPTION_UNLOCK_SCORE;
   const canAfford  = state.credits >= state.redemptionCost;
 
   const redeemBtn = showRedeem
@@ -2255,22 +2694,31 @@ function showGameOver() {
         `YOU HAVE ${formatCredits(state.credits)}.</div>`
     : '';
 
+  const title      = fired ? 'TERMINATED — INSOLVENCY' : 'THE MACHINE HAS BEEN RELEASED';
+  const subtitle   = fired ? 'YOUR DEBT TO THE COMPANY EXCEEDED ACCEPTABLE LIMITS'
+                           : 'CONSEQUENCES CANNOT BE UNDONE';
+  const compliance = fired ? 'INSOLVENT' : 'NON-COMPLIANT';
+  const flavor     = fired ? '"The company thanks you for your service."' : '"You had one job."';
+  const creditLine = fired
+    ? `<div>FINAL BALANCE &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${formatCredits(state.credits)} CR</div>`
+    : `<div>CREDITS UNSPENT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${formatCredits(state.credits)}</div>`;
+
   const overlay = document.getElementById('overlay');
   overlay.classList.remove('hidden');
   overlay.classList.add('blackout');   // keep the dead game screen fully black behind the recap
   overlay.innerHTML = `
     <div class="overlay-content">
-      <div class="overlay-title">THE MACHINE HAS BEEN RELEASED</div>
-      <div class="overlay-subtitle">CONSEQUENCES CANNOT BE UNDONE</div>
+      <div class="overlay-title">${title}</div>
+      <div class="overlay-subtitle">${subtitle}</div>
       <div class="overlay-stats">
         <div>SEQUENCES COMPLETED &nbsp;&nbsp;: ${state.score}</div>
         <div>INPUT EFFICIENCY &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${efficiency()}</div>
-        <div>CREDITS UNSPENT &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${formatCredits(state.credits)}</div>
+        ${creditLine}
         <div>PERSONAL BEST &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${loadHighScore()}</div>
-        <div>COMPLIANCE STATUS &nbsp;&nbsp;&nbsp;&nbsp;: NON-COMPLIANT</div>
+        <div>COMPLIANCE STATUS &nbsp;&nbsp;&nbsp;&nbsp;: ${compliance}</div>
         ${isNewBest ? '<div class="new-highscore">&#x25B6; NEW PERSONAL BEST RECORDED &#x25C0;</div>' : ''}
       </div>
-      <div class="overlay-flavor">"You had one job."</div>
+      <div class="overlay-flavor">${flavor}</div>
       <button id="start-over-btn" class="overlay-btn">START OVER</button>
       ${redeemBtn}
       ${redeemNote}
@@ -2535,6 +2983,11 @@ const TUTORIAL_STEPS = {
     title:  'CONSUMABLES',
     body:   'Items you bought claim a slot here, with their charge count. Trigger them during play with the matching number-row key (1–9), or click the slot.',
   },
+  purge: {
+    target: '#bindings-grid',
+    title:  'NUMERIC COMPLIANCE — PURGE',
+    body:   'Repetitive strain has built up. Clear the numpad sequences to purge it: enter each digit ON THE NUMPAD before its bar empties. The bar refills with every correct digit; a wrong digit restarts that sequence. Failure will result in continued strain accumulation and the associated fees will increase.',
+  },
   numpad: {
     target: '#bindings-grid',
     title:  'NUMPAD BONUS TIER',
@@ -2582,6 +3035,11 @@ function presentTutorial(id, step, target) {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
     state.tutorialPaused = true;
+  } else if (state.phase === 'PURGE' && state.purgeInterval) {
+    // During a purge, freeze the sub-sequence bar so reading the tip can't fail it.
+    clearInterval(state.purgeInterval);
+    state.purgeInterval = null;
+    state.tutorialPaused = true;
   }
 
   const overlay = document.getElementById('tutorial-overlay');
@@ -2597,8 +3055,35 @@ function presentTutorial(id, step, target) {
   positionTutorial(target);
   overlay.querySelector('.tut-tooltip-btn').addEventListener('click', () => dismissTutorial());
 
-  state._tutResize = () => positionTutorial(target);
-  window.addEventListener('resize', state._tutResize);
+  // Enable smooth tracking only after the first placement, so the box appears on
+  // target instead of sliding in from the corner (see .tut-highlight.positioned).
+  requestAnimationFrame(() => {
+    const hl = overlay.querySelector('.tut-highlight');
+    if (hl) hl.classList.add('positioned');
+  });
+
+  // Re-measure on any reflow, not just window resizes. Log lines stream into the
+  // machine log after the tip opens, fonts swap in, and the window can move to a
+  // monitor of a different resolution — each can shift the target. A ResizeObserver
+  // watches the target and every panel in the scroll column (a panel growing above
+  // the target moves it without changing the target's own size), so the box tracks
+  // the target through all of them.
+  const reposition = () => positionTutorial(target);
+  state._tutResize = reposition;
+  window.addEventListener('resize', reposition);
+
+  const scroller = document.getElementById('content-scroll');
+  if (typeof ResizeObserver === 'function') {
+    state._tutObserver = new ResizeObserver(reposition);
+    state._tutObserver.observe(target);
+    if (scroller) {
+      for (const panel of scroller.children) state._tutObserver.observe(panel);
+    }
+  }
+  if (scroller) {
+    state._tutScroll = reposition;
+    scroller.addEventListener('scroll', reposition, { passive: true });
+  }
 }
 
 function positionTutorial(target) {
@@ -2638,6 +3123,8 @@ function dismissTutorial() {
   const id = state.tutorialQueue.shift();
   if (id) markTutorialSeen(id);
   state.tutorialActive = false;
+  // Capture the post-'basics' hook before hideTutorial() clears it.
+  const afterBasics = (id === 'basics') ? state.afterBasics : null;
   hideTutorial();
 
   // Resume the countdown if we paused it and play is still live.
@@ -2645,9 +3132,14 @@ function dismissTutorial() {
     state.tutorialPaused = false;
     if (state.phase === 'PLAYING' && !document.hidden) {
       state.timerInterval = setInterval(tickTimer, 1000);
+    } else if (state.phase === 'PURGE' && !document.hidden && state.purgeTimeLeft > 0) {
+      startPurgeBar();   // resume the frozen purge bar (visibilitychange handles tab-hidden)
     }
   }
   showNextTutorial();   // chain any further queued tips
+
+  // The first 'basics' tip gates the machine-log boot-up: stream it now that it's dismissed.
+  if (typeof afterBasics === 'function') afterBasics();
 }
 
 /** Tear down the overlay/listener without advancing the queue (e.g. on restart). */
@@ -2661,8 +3153,18 @@ function hideTutorial() {
     window.removeEventListener('resize', state._tutResize);
     state._tutResize = null;
   }
+  if (state._tutObserver) {
+    state._tutObserver.disconnect();
+    state._tutObserver = null;
+  }
+  if (state._tutScroll) {
+    const scroller = document.getElementById('content-scroll');
+    if (scroller) scroller.removeEventListener('scroll', state._tutScroll);
+    state._tutScroll = null;
+  }
   state.tutorialActive = false;
   state.tutorialQueue  = [];
+  state.afterBasics    = null;
 }
 
 // ============================================================
@@ -2818,6 +3320,16 @@ document.addEventListener('keydown', e => {
 
 // Pause the game timer when the player switches tabs
 document.addEventListener('visibilitychange', () => {
+  // Pause/resume the purge bar too, so tab-switching mid-purge can't force an unfair fail.
+  if (state.phase === 'PURGE') {
+    if (document.hidden) {
+      clearInterval(state.purgeInterval);
+      state.purgeInterval = null;
+    } else if (!state.purgeInterval && state.purgeTimeLeft > 0) {
+      startPurgeBar();
+    }
+    return;
+  }
   if (state.phase !== 'PLAYING') return;
   if (document.hidden) {
     if (state.timerInterval) {

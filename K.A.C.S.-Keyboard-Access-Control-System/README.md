@@ -45,13 +45,5 @@ reach zero.**
 
 ---
 
-## TO BEGIN YOUR SERVICE
-
-Press **BEGIN SERVICE**.
-
- > Good luck, Employee. You had one job.
-
----
-
 <sub>For boring, non-binding, human-readable documentation, consult [TECHNICAL MANUAL.md](<TECHNICAL MANUAL.md>).
 The Organization©™® disavows the existence of that file and everyone who reads it.</sub>
