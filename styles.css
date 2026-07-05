@@ -108,6 +108,26 @@ body, html {
     position: relative;
 }
 
+.kacs-popup {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 10px;
+    align-items: center;
+    gap: 10px;
+}
+
+.kacs-popup.open {
+    display: flex;
+}
+
+.itch-embed iframe {
+    display: block;
+    border: 1px solid white;
+    border-radius: 5px;
+}
+
 .button-grid {
     display: grid;
     grid-template-columns: repeat(3, 100px);

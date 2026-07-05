@@ -93,3 +93,21 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(error => console.error('Error fetching aboutme.txt:', error));
 });
 
+// KACS nav popup toggle
+document.addEventListener("DOMContentLoaded", function() {
+    const toggle = document.querySelector(".kacs-toggle");
+    const popup = document.querySelector(".kacs-popup");
+    if (!toggle || !popup) return;
+
+    toggle.addEventListener("click", function(event) {
+        event.stopPropagation();
+        popup.classList.toggle("open");
+    });
+
+    document.addEventListener("click", function(event) {
+        if (!popup.contains(event.target) && event.target !== toggle) {
+            popup.classList.remove("open");
+        }
+    });
+});
+
