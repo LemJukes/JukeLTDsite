@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KEYBOARD CONTROL | THE MACHINE</title>
-  <link rel="stylesheet" href="style.css?v=13" />
+  <link rel="stylesheet" href="style.css?v=14" />
 </head>
 <body>
 
@@ -59,6 +59,8 @@
         </div>
         <!-- Break-room expansion choice (REVEAL vs BLIND); populated by game.js -->
         <div id="expansion-choice" class="hidden"></div>
+        <!-- Break-room CALM MODE toggle (KACS-SAFE-001); populated by game.js -->
+        <div id="calm-toggle-slot" class="hidden"></div>
         <!-- Clickable break-room exit (mirrors pressing ENTER); shown by game.js -->
         <button id="return-to-service-btn" class="hidden" type="button">RETURN TO SERVICE ▶</button>
       </section>
@@ -136,6 +138,6 @@
   <!-- Reset-save confirmation modal; populated by game.js -->
   <div id="reset-confirm" class="hidden"></div>
 
-  <script src="game.js?v=17"></script>
+  <script src="game.js?v=18"></script>
 </body>
 </html>

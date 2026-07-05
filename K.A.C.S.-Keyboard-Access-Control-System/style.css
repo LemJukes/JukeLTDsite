@@ -1061,6 +1061,47 @@ html, body {
   color: var(--amber);
 }
 
+/* ── CALM MODE toggle (KACS-SAFE-001) ────────────────────────
+   Shown on the start screen and in the break room — the in-universe
+   "ERGONOMIC DISPLAY DIRECTIVE" the Organization begrudgingly complies with.
+   Disabling flicker/shake is a safety accommodation, not a cosmetic option,
+   so it's styled plainly rather than themed red/amber like the hazards it defuses. */
+.calm-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--cyan);
+  text-align: left;
+  cursor: pointer;
+}
+
+.calm-toggle input[type="checkbox"] {
+  flex: none;
+  margin-top: 2px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+
+.calm-toggle:has(input:disabled) { cursor: default; }
+.calm-toggle input:disabled { cursor: default; }
+
+.flash-warning {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--amber);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--amber);
+  text-align: left;
+}
+
 /* ── ANIMATIONS ────────────────────────────────────────────── */
 @keyframes blink {
   0%, 100% { opacity: 1; }
@@ -1783,18 +1824,49 @@ html, body {
   .key-cell.reserved .key-count { font-size: 9px; }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   CALM MODE (KACS-SAFE-001) — flash/flicker/shake remediation.
+   html.calm-mode is set by game.js from two independent triggers: the OS
+   prefers-reduced-motion query, and the in-game toggle (start screen + break
+   room), persisted as kacs_calm_mode. One code path, two triggers — every
+   rule below reads only the class, never the media query directly.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Timer/strain flicker → static color states. The color escalation
+   (green→amber→red) already carries the information; the flicker is redundant. */
+html.calm-mode #timer-number.timer-warning,
+html.calm-mode #timer-number.timer-danger,
+html.calm-mode #timer-number.timer-frozen,
+html.calm-mode #strain-num.strain-high { animation: none; }
+
+/* Shake → none. Error feedback survives via echo-flash-error color. */
+html.calm-mode .shake { animation: none; }
+
+/* Death throes → simple fade instead of stepped strobe. */
+html.calm-mode .dying #header,
+html.calm-mode .dying #sequence-panel,
+html.calm-mode .dying #timer-panel,
+html.calm-mode .dying #bindings-panel,
+html.calm-mode .dying #break-room,
+html.calm-mode .dying #input-panel {
+  animation: calm-fade-out 1.6s ease forwards;
+}
+@keyframes calm-fade-out { to { opacity: 0; } }
+
+/* Full-background red pulse and the GAME OVER "M" falter → static instead. */
+html.calm-mode .consequences { animation: none; background: #1a0000; }
+html.calm-mode .gameover-text .go-m { animation: none; }
+
 /* Reduced motion: drop the breach's heavy animations. The cracks still appear and
    the shatter still resolves to the splash + black void — just without the breathing
    bloom, the flood, or the white-out crossfade (matching the intro's courtesy). */
-@media (prefers-reduced-motion: reduce) {
-  .crack-light,
-  #crack-overlay.crack-burst .crack-light,
-  #crack-overlay.crack-burst .crack-grp path { animation: none; }
-  .crack-grp, .crack-light { transition: none; }
-  #ascension-splash { animation: none; background: #f5f3ec; }
-  .crayon-letter { animation: none; opacity: 1; transform: none; }
-  .crayon-line { transition: none; }
-}
+html.calm-mode .crack-light,
+html.calm-mode #crack-overlay.crack-burst .crack-light,
+html.calm-mode #crack-overlay.crack-burst .crack-grp path { animation: none; }
+html.calm-mode .crack-grp, html.calm-mode .crack-light { transition: none; }
+html.calm-mode #ascension-splash { animation: none; background: #f5f3ec; }
+html.calm-mode .crayon-letter { animation: none; opacity: 1; transform: none; }
+html.calm-mode .crayon-line { transition: none; }
 
 /* ── RESET-SAVE CONTROL (header) ───────────────────────────── */
 /* The save system's one visible surface: a small circular-arrow button that

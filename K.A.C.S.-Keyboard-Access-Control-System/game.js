@@ -126,6 +126,30 @@ const SAVE_KEY     = 'kacs_save';
 /** Bumped whenever the snapshot shape changes, so stale saves are ignored. */
 const SAVE_VERSION = 3;
 
+// ── CALM MODE (KACS-SAFE-001 — photosensitivity/vestibular safety) ──
+// Every flicker/strobe/shake effect in the game is gated behind the single
+// html.calm-mode class (see style.css). Two independent triggers set it: the
+// OS-level prefers-reduced-motion query, and the in-game toggle (start screen
+// + break room), persisted below. One CSS code path, two triggers.
+const CALM_MODE_KEY     = 'kacs_calm_mode';
+const REDUCED_MOTION_MQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function calmModeUserPref() {
+  try { return localStorage.getItem(CALM_MODE_KEY) === '1'; } catch (e) { return false; }
+}
+function setCalmModeUserPref(on) {
+  try { localStorage.setItem(CALM_MODE_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
+}
+/** True if either trigger demands calm mode. */
+function calmModeActive() {
+  return calmModeUserPref() || REDUCED_MOTION_MQ.matches;
+}
+function applyCalmMode() {
+  document.documentElement.classList.toggle('calm-mode', calmModeActive());
+}
+// The OS setting can change while the tab is open; keep the effect live.
+REDUCED_MOTION_MQ.addEventListener('change', applyCalmMode);
+
 // ── Redemption (paid in-place revive on game over; resets each run) ──
 /** Sequences the run must reach before ATTEMPT REDEMPTION appears on the recap. */
 const REDEMPTION_UNLOCK_SCORE  = 25;
@@ -973,7 +997,7 @@ function updateScreenGlitch(t) {
   const overlay   = document.getElementById('glitch-overlay');
   if (!container) return;
 
-  const active = state.phase === 'PLAYING' && !state.timerFrozen;
+  const active = state.phase === 'PLAYING' && !state.timerFrozen && !calmModeActive();
   const severe = active && t <= 5;
   const mild   = active && t <= 15 && t > 5;
 
@@ -1494,9 +1518,46 @@ function animateIntro() {
   }, HOLD);
 }
 
+// ── CALM MODE UI (start screen + break room) ───────────────────
+// A single reusable control, framed in-universe as an "ERGONOMIC DISPLAY
+// DIRECTIVE" memo. When the OS query already forces calm mode on, the
+// checkbox shows checked-and-disabled — unticking it couldn't do anything,
+// since that trigger overrides the in-game one.
+function calmToggleHTML() {
+  const forced = REDUCED_MOTION_MQ.matches;
+  return `
+    <label class="calm-toggle"${forced ? ' title="Enabled by your system’s reduced-motion setting"' : ''}>
+      <input type="checkbox" id="calm-mode-toggle"${calmModeActive() ? ' checked' : ''}${forced ? ' disabled' : ''}>
+      <span>ERGONOMIC DISPLAY DIRECTIVE (CALM MODE) — The Organization has been compelled to
+      offer a flicker-, flash- and shake-free display. Compliance status unaffected.</span>
+    </label>`;
+}
+
+function wireCalmToggle() {
+  const box = document.getElementById('calm-mode-toggle');
+  if (!box || box.disabled) return;
+  box.addEventListener('change', () => {
+    setCalmModeUserPref(box.checked);
+    applyCalmMode();
+  });
+}
+
+// ── First-run flash warning (KACS-SAFE-001 §4) ─────────────────
+// Shown once ever on the start screen, alongside the calm-mode toggle;
+// acknowledged the moment the player begins service.
+function hasSeenFlashWarning() {
+  try { return localStorage.getItem('kacs_flash_ack') === '1'; } catch (e) { return false; }
+}
+function ackFlashWarning() {
+  try { localStorage.setItem('kacs_flash_ack', '1'); } catch (e) { /* ignore */ }
+}
+
 function showStartScreen() {
   const overlay = document.getElementById('overlay');
   overlay.classList.remove('hidden');
+  const flashWarning = hasSeenFlashWarning() ? '' :
+    '<div class="flash-warning">This game contains flashing imagery and screen shake. ' +
+    'CALM MODE (below) disables these effects.</div>';
   // Mirrors README.md — the in-universe employee induction, deliberate
   // corporate "typos" (timre, responsibilty, ©™®¶) preserved intentionally.
   overlay.innerHTML = `
@@ -1529,12 +1590,18 @@ function showStartScreen() {
            hesitation. So is reading this sentence too slowly. DO NOT DEVIATE. DO NOT HESITATE.
            DO NOT LET THE TIMER REACH ZERO.</p>
       </div>
+      ${flashWarning}
+      ${calmToggleHTML()}
       <button id="start-btn" class="overlay-btn">BEGIN SERVICE</button>
       <div class="overlay-flavor">Good luck, Employee. You had one job.</div>
       </div>
     </div>
   `;
-  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('start-btn').addEventListener('click', () => {
+    ackFlashWarning();
+    startGame();
+  });
+  wireCalmToggle();
   animateIntro();
 }
 
@@ -1629,6 +1696,7 @@ function startGame() {
   document.getElementById('return-to-service-btn').classList.add('hidden');
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
+  document.getElementById('calm-toggle-slot').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
 
   // Build the first sequence up-front and render every panel to its fresh reset state,
@@ -1976,6 +2044,11 @@ function renderBreakRoomScreen() {
   document.getElementById('break-room').classList.toggle('hidden', !state.requisitionUnlocked);
   document.getElementById('game-container').classList.toggle('in-break', state.requisitionUnlocked);
 
+  const calmSlot = document.getElementById('calm-toggle-slot');
+  calmSlot.classList.remove('hidden');
+  calmSlot.innerHTML = calmToggleHTML();
+  wireCalmToggle();
+
   renderKeyBindings();   // interactive + frequency-coloured; reserved row reverts to placeholders
   if (state.requisitionUnlocked) renderShop();
   renderExpansionChoice();
@@ -2301,6 +2374,7 @@ function leaveBreakRoom() {
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
   document.getElementById('expansion-choice').classList.add('hidden');
+  document.getElementById('calm-toggle-slot').classList.add('hidden');
 
   // Sequence length stays at the baseline until the expansion gate opens, then
   // ramps one tier per expansion break room (shares the gate with key expansion).
@@ -2939,6 +3013,7 @@ function rebirthRun() {
   document.getElementById('rebind-hint').classList.add('hidden');
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
+  document.getElementById('calm-toggle-slot').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
 
   clearLog();
@@ -3350,6 +3425,8 @@ document.addEventListener('visibilitychange', () => {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  applyCalmMode();   // before any render, so nothing flickers even for a frame
+
   // Render an empty binding grid behind the overlay for aesthetics
   initKeyBindings();
   renderKeyBindings();
