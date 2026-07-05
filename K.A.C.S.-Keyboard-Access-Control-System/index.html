@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KEYBOARD CONTROL | THE MACHINE</title>
-  <link rel="stylesheet" href="style.css?v=14" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
 
@@ -25,20 +25,28 @@
       <span id="header-title">KEYBOARD CONTROL SYSTEM&nbsp;&nbsp;v1.08</span>
       <div id="header-right">
         <span id="header-stats">
-          SEQUENCES:&nbsp;<span id="score-num">0</span>
+          <span class="stat-glyph" data-tip="SEQUENCES COMPLETED" tabindex="0">&sect;</span>&nbsp;<span id="score-num">0</span>
           &nbsp;|&nbsp;
-          STREAK:&nbsp;<span id="streak-num">0</span>
+          <span class="stat-glyph" data-tip="CLEAN-ENTRY STREAK" tabindex="0">&Dagger;</span>&nbsp;<span id="streak-num">0</span>
           &nbsp;|&nbsp;
-          CREDITS:&nbsp;<span id="credits-num">0</span>
+          <span class="stat-glyph" data-tip="COMPLIANCE CREDITS" tabindex="0">&curren;</span>&nbsp;<span id="credits-num">0</span>
           &nbsp;|&nbsp;
-          STRAIN:&nbsp;<span id="strain-num">0</span>
+          <span class="stat-glyph" data-tip="REPETITIVE STRAIN" tabindex="0">&dagger;</span>&nbsp;<span id="strain-num">0</span>
           &nbsp;|&nbsp;
-          EFFICIENCY:&nbsp;<span id="efficiency-num">--%</span>
+          <span class="stat-glyph tip-left" data-tip="INPUT ACCURACY" tabindex="0">&#x25A0;</span>&nbsp;<span id="efficiency-num">--%</span>
           &nbsp;|&nbsp;
-          BEST:&nbsp;<span id="highscore-num">0</span>
+          <span class="stat-glyph tip-left" data-tip="ALL-TIME BEST" tabindex="0">&#x2691;</span>&nbsp;<span id="highscore-num">0</span>
         </span>
-        <button id="reset-save-btn" class="reset-save-btn" type="button"
-                title="Reset all saved progress" aria-label="Reset all saved progress">&#x21bb;</button>
+        <div id="options-menu" class="options-menu">
+          <button id="options-btn" class="options-btn" type="button"
+                  title="Options" aria-label="Options" aria-haspopup="true" aria-expanded="false">&#x2699;</button>
+          <div id="options-popout" class="options-popout hidden">
+            <!-- CALM MODE toggle (KACS-SAFE-001); populated by game.js -->
+            <div id="calm-toggle-slot"></div>
+            <button id="reset-save-btn" class="reset-save-btn" type="button"
+                    title="Reset all saved progress" aria-label="Reset all saved progress">&#x21bb;&nbsp; RESET SAVE DATA</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -59,8 +67,6 @@
         </div>
         <!-- Break-room expansion choice (REVEAL vs BLIND); populated by game.js -->
         <div id="expansion-choice" class="hidden"></div>
-        <!-- Break-room CALM MODE toggle (KACS-SAFE-001); populated by game.js -->
-        <div id="calm-toggle-slot" class="hidden"></div>
         <!-- Clickable break-room exit (mirrors pressing ENTER); shown by game.js -->
         <button id="return-to-service-btn" class="hidden" type="button">RETURN TO SERVICE ▶</button>
       </section>
@@ -138,6 +144,6 @@
   <!-- Reset-save confirmation modal; populated by game.js -->
   <div id="reset-confirm" class="hidden"></div>
 
-  <script src="game.js?v=18"></script>
+  <script src="game.js?v=19"></script>
 </body>
 </html>

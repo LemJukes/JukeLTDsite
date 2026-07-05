@@ -1518,23 +1518,27 @@ function animateIntro() {
   }, HOLD);
 }
 
-// ── CALM MODE UI (start screen + break room) ───────────────────
+// ── CALM MODE UI (start screen + header options menu) ──────────
 // A single reusable control, framed in-universe as an "ERGONOMIC DISPLAY
 // DIRECTIVE" memo. When the OS query already forces calm mode on, the
 // checkbox shows checked-and-disabled — unticking it couldn't do anything,
-// since that trigger overrides the in-game one.
-function calmToggleHTML() {
+// since that trigger overrides the in-game one. Rendered in more than one
+// place at once (start screen + header popout), so each instance gets its
+// own element id via idSuffix to avoid duplicate-id collisions.
+function calmToggleHTML(idSuffix) {
+  const id     = idSuffix ? `calm-mode-toggle-${idSuffix}` : 'calm-mode-toggle';
   const forced = REDUCED_MOTION_MQ.matches;
   return `
-    <label class="calm-toggle"${forced ? ' title="Enabled by your system’s reduced-motion setting"' : ''}>
-      <input type="checkbox" id="calm-mode-toggle"${calmModeActive() ? ' checked' : ''}${forced ? ' disabled' : ''}>
+    <label class="calm-toggle" for="${id}"${forced ? ' title="Enabled by your system’s reduced-motion setting"' : ''}>
+      <input type="checkbox" id="${id}"${calmModeActive() ? ' checked' : ''}${forced ? ' disabled' : ''}>
       <span>ERGONOMIC DISPLAY DIRECTIVE (CALM MODE) — The Organization has been compelled to
       offer a flicker-, flash- and shake-free display. Compliance status unaffected.</span>
     </label>`;
 }
 
-function wireCalmToggle() {
-  const box = document.getElementById('calm-mode-toggle');
+function wireCalmToggle(idSuffix) {
+  const id  = idSuffix ? `calm-mode-toggle-${idSuffix}` : 'calm-mode-toggle';
+  const box = document.getElementById(id);
   if (!box || box.disabled) return;
   box.addEventListener('change', () => {
     setCalmModeUserPref(box.checked);
@@ -1591,7 +1595,7 @@ function showStartScreen() {
            DO NOT LET THE TIMER REACH ZERO.</p>
       </div>
       ${flashWarning}
-      ${calmToggleHTML()}
+      ${calmToggleHTML('start')}
       <button id="start-btn" class="overlay-btn">BEGIN SERVICE</button>
       <div class="overlay-flavor">Good luck, Employee. You had one job.</div>
       </div>
@@ -1601,7 +1605,7 @@ function showStartScreen() {
     ackFlashWarning();
     startGame();
   });
-  wireCalmToggle();
+  wireCalmToggle('start');
   animateIntro();
 }
 
@@ -1696,7 +1700,6 @@ function startGame() {
   document.getElementById('return-to-service-btn').classList.add('hidden');
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
-  document.getElementById('calm-toggle-slot').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
 
   // Build the first sequence up-front and render every panel to its fresh reset state,
@@ -2044,11 +2047,6 @@ function renderBreakRoomScreen() {
   document.getElementById('break-room').classList.toggle('hidden', !state.requisitionUnlocked);
   document.getElementById('game-container').classList.toggle('in-break', state.requisitionUnlocked);
 
-  const calmSlot = document.getElementById('calm-toggle-slot');
-  calmSlot.classList.remove('hidden');
-  calmSlot.innerHTML = calmToggleHTML();
-  wireCalmToggle();
-
   renderKeyBindings();   // interactive + frequency-coloured; reserved row reverts to placeholders
   if (state.requisitionUnlocked) renderShop();
   renderExpansionChoice();
@@ -2374,7 +2372,6 @@ function leaveBreakRoom() {
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
   document.getElementById('expansion-choice').classList.add('hidden');
-  document.getElementById('calm-toggle-slot').classList.add('hidden');
 
   // Sequence length stays at the baseline until the expansion gate opens, then
   // ramps one tier per expansion break room (shares the gate with key expansion).
@@ -3013,7 +3010,6 @@ function rebirthRun() {
   document.getElementById('rebind-hint').classList.add('hidden');
   document.getElementById('break-room').classList.add('hidden');
   document.getElementById('freq-legend').classList.add('hidden');
-  document.getElementById('calm-toggle-slot').classList.add('hidden');
   document.getElementById('input-echo').textContent = '';
 
   clearLog();
@@ -3243,17 +3239,59 @@ function hideTutorial() {
 }
 
 // ============================================================
+// OPTIONS MENU (header) — CALM MODE toggle + RESET SAVE, tucked behind a
+// single gear button so neither control is a stray one-click hazard: opening
+// the popout is click one, activating either control inside it is click two.
+// ============================================================
+
+function closeOptionsMenu() {
+  const popout = document.getElementById('options-popout');
+  const btn    = document.getElementById('options-btn');
+  if (!popout || popout.classList.contains('hidden')) return;
+  popout.classList.add('hidden');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function initOptionsMenu() {
+  const menu   = document.getElementById('options-menu');
+  const btn    = document.getElementById('options-btn');
+  const popout = document.getElementById('options-popout');
+  const slot   = document.getElementById('calm-toggle-slot');
+  if (!menu || !btn || !popout || !slot) return;
+
+  slot.innerHTML = calmToggleHTML('header');
+  wireCalmToggle('header');
+
+  btn.addEventListener('click', () => {
+    const nowOpen = popout.classList.toggle('hidden') === false;
+    btn.setAttribute('aria-expanded', String(nowOpen));
+  });
+
+  // Click anywhere outside the menu closes it.
+  document.addEventListener('click', e => {
+    if (!menu.contains(e.target)) closeOptionsMenu();
+  });
+
+  // ESC closes it too (harmless everywhere else — no gameplay key uses it).
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeOptionsMenu();
+  });
+}
+
+// ============================================================
 // RESET CONTROL (purge all saved progress)
 // ============================================================
-// The save system is otherwise invisible; the header's circular-arrow button is
-// its one interactive surface. It opens a confirmation, then purges the run
-// checkpoint and tutorial flags (the high score persists) and reloads.
+// The save system is otherwise invisible; it lives behind the header's
+// options popout (gear button). Clicking RESET SAVE DATA opens a
+// confirmation, then purges the run checkpoint and tutorial flags (the high
+// score persists) and reloads.
 
 function initResetButton() {
   const btn = document.getElementById('reset-save-btn');
   if (!btn) return;
   btn.addEventListener('click', () => {
     btn.blur();          // don't let a stray ENTER re-trigger the button
+    closeOptionsMenu();
     showResetConfirm();
   });
 }
@@ -3432,6 +3470,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderKeyBindings();
   document.getElementById('highscore-num').textContent = loadHighScore();
   initResetButton();
+  initOptionsMenu();
 
   // Tap-to-exit the break room (mirrors pressing ENTER) — static element, wired once.
   document.getElementById('return-to-service-btn')
