@@ -26,8 +26,18 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://jukeltd.com/serious_projects.html</loc>
+    <lastmod>2026-08-07</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://jukeltd.com/silly_projects.html</loc>
     <lastmod>2026-06-17</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://jukeltd.com/GeomText/</loc>
+    <lastmod>2026-08-07</lastmod>
     <priority>0.5</priority>
   </url>
   <url>

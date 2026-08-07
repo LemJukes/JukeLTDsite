@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeomText — Juke LTD. (Rob Garner)</title>
+    <meta name="description" content="GeomText turns a line of text in any installed font into DXF outline geometry you can cut. A free Windows utility by Rob Garner (Juke LTD).">
+    <meta name="author" content="Rob Garner">
+    <link rel="canonical" href="https://jukeltd.com/GeomText/">
+    <meta name="theme-color" content="#000000">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Juke LTD.">
+    <meta property="og:title" content="GeomText — Juke LTD. (Rob Garner)">
+    <meta property="og:description" content="GeomText turns a line of text in any installed font into DXF outline geometry you can cut. A free Windows utility by Rob Garner (Juke LTD).">
+    <meta property="og:url" content="https://jukeltd.com/GeomText/">
+    <meta property="og:image" content="https://jukeltd.com/GeomText/GeomText-screenshot.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="GeomText — Juke LTD. (Rob Garner)">
+    <meta name="twitter:description" content="GeomText turns a line of text in any installed font into DXF outline geometry you can cut. A free Windows utility by Rob Garner (Juke LTD).">
+    <meta name="twitter:image" content="https://jukeltd.com/GeomText/GeomText-screenshot.png">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="icon" href="../jukeLTDFavicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="../jukeLTDFavicon.png">
+</head>
+<body class="project-page">
+    <div id="orrery"></div>
+    <div class="content">
+        <h1 class="header">&lt; GeomText &gt;</h1>
+        <p class="project-tagline">Type a line of text. Get its letterforms as cuttable DXF geometry.</p>
+
+        <img src="GeomText-screenshot.png" alt="The GeomText window: a text field reading Lorem Ipsum, font family and style pickers, cap height and tolerance controls, and a preview of the outlined letterforms." class="project-shot" width="888" height="678">
+
+        <div class="project-section">
+            <h2>What it does</h2>
+            <p>Type a line of text, pick an installed font, get its letterforms as DXF outline geometry you can cut. The DXF contains closed polylines &mdash; the real glyph contours &mdash; not DXF TEXT entities, so it does not matter whether your CAM software has the font.</p>
+            <p>Windows 10/11, 64-bit. Nothing to install: one file, no Python needed.</p>
+        </div>
+
+        <div class="project-buttons">
+            <a href="https://github.com/LemJukes/GeomText-pub/releases/download/v1.0.0-alpha/GeomText.exe" class="nav-button" rel="noopener">Download GeomText.exe (65 MB)</a>
+            <a href="https://github.com/LemJukes/GeomText-pub" class="nav-button" rel="noopener">Source on GitHub</a>
+            <a href="README-GeomText.txt" class="nav-button">Read the full README</a>
+        </div>
+
+        <div class="project-section">
+            <h2>Running it</h2>
+            <p>Double-click <code>GeomText.exe</code>.</p>
+            <div class="project-note">
+                <p>Windows will probably stop you the first time: &ldquo;Windows protected your PC&rdquo;. That is SmartScreen reacting to an unsigned exe from an unknown developer, not a virus warning. Click &ldquo;More info&rdquo;, then &ldquo;Run anyway&rdquo;.</p>
+            </div>
+            <p>First launch scans every font on your machine and can take up to a minute with no window on screen. Later launches reuse the scan and open immediately. Fonts you install while GeomText is open show up on the next launch, not this one.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Quick start</h2>
+            <ol>
+                <li>Type your text.</li>
+                <li>Pick a family and a style.</li>
+                <li>Set the cap height, in inches &mdash; that is the height of a capital H, not a point size and not the height of the tallest thing in your string.</li>
+                <li>Press Preview. What you see is the vertices the file will contain.</li>
+                <li>Export&hellip;</li>
+            </ol>
+        </div>
+
+        <div class="project-section">
+            <h2>Before you cut</h2>
+            <div class="project-note">
+                <p>UNITS ARE INCHES AND THE FILE DOES NOT SAY SO. R12 DXF has no units record. Set inches when you import; if your CAM software assumes millimetres the part comes out 25.4x too small and nothing warns you.</p>
+            </div>
+            <p>The origin is the baseline at the left edge of the ink. Y=0 is the baseline, so descenders sit at negative Y.</p>
+            <p>Tolerance is the largest gap, in inches, between the flattened polyline and the true curve. Coarse 0.005&Prime;, Normal 0.001&Prime;, Fine 0.0002&Prime;. Same number at any cap height. Use &ldquo;Show points&rdquo; zoomed in on one letter to judge which you need.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Known limits in this build</h2>
+            <ul>
+                <li>One line only. No wrapping, alignment, or line spacing.</li>
+                <li>Latin / Western European, left to right. Hebrew and Arabic are refused rather than exported wrong.</li>
+                <li>Characters the font does not contain are dropped, and named in the warning strip.</li>
+                <li>Overlapping glyphs are not merged. Script fonts and tightly kerned pairs emit crossing outlines, which an even-odd CAM reader treats as holes.</li>
+                <li>No mirroring for face-down cutting.</li>
+                <li>Symbol fonts (Wingdings and friends) are listed with a warning icon. A typed &ldquo;A&rdquo; gives you whatever that font maps A to.</li>
+            </ul>
+            <p>Check your font's licence before cutting its letterforms into anything you sell. GeomText does not check for you and cannot.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Source</h2>
+            <p>GeomText is open source under the MIT licence: <a href="https://github.com/LemJukes/GeomText-pub" rel="noopener">github.com/LemJukes/GeomText-pub</a>.</p>
+            <p>Builds are published as <a href="https://github.com/LemJukes/GeomText-pub/releases" rel="noopener">releases</a> &mdash; the download button above points at the <code>v1.0.0-alpha</code> asset.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Reporting a bug</h2>
+            <p>File it at <a href="https://github.com/LemJukes/GeomText-pub/issues" rel="noopener">github.com/LemJukes/GeomText-pub/issues</a>. Search first in case it is already open. No GitHub account? Email <a href="mailto:rob@rjgarner.com">rob@rjgarner.com</a> with the same information.</p>
+            <p>Tell me the exact text you typed, the font family and style, the cap height, and the tolerance &mdash; those four values reproduce almost everything &mdash; plus what you expected and what happened instead, and your Windows version and the version shown by the About button.</p>
+            <p>If it crashed or would not open at all, attach the log file at <code>%LOCALAPPDATA%\GeomText\geomtext.log</code>. A windowed exe has nowhere else to put the error, so that file is the single most useful thing you can send.</p>
+        </div>
+
+        <p class="project-meta">Alpha 1.0 test build &middot; Windows 10/11, 64-bit &middot; MIT licence</p>
+    </div>
+    <a href="../serious_projects.html" class="back-button">Back</a>
+    <script src="../script.js"></script>
+</body>
+</html>

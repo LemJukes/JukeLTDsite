@@ -1,0 +1,106 @@
+GeomText — Alpha 1.0 test build
+===============================
+
+Type a line of text, pick an installed font, get its letterforms as DXF outline
+geometry you can cut. The DXF contains closed polylines — the real glyph
+contours — not DXF TEXT entities, so it does not matter whether your CAM
+software has the font.
+
+Windows 10/11, 64-bit. Nothing to install: one file, no Python needed.
+
+
+Running it
+----------
+
+Double-click GeomText.exe.
+
+Windows will probably stop you the first time: "Windows protected your PC".
+That is SmartScreen reacting to an unsigned exe from an unknown developer, not
+a virus warning. Click "More info", then "Run anyway".
+
+First launch scans every font on your machine and can take up to a minute with
+no window on screen. Later launches reuse the scan and open immediately. Fonts
+you install while GeomText is open show up on the next launch, not this one.
+
+
+Quick start
+-----------
+
+1. Type your text.
+2. Pick a family and a style.
+3. Set the cap height, in inches — that is the height of a capital H, not a
+   point size and not the height of the tallest thing in your string.
+4. Press Preview. What you see is the vertices the file will contain.
+5. Export…
+
+
+Before you cut
+--------------
+
+UNITS ARE INCHES AND THE FILE DOES NOT SAY SO. R12 DXF has no units record. Set
+inches when you import; if your CAM software assumes millimetres the part comes
+out 25.4x too small and nothing warns you.
+
+The origin is the baseline at the left edge of the ink. Y=0 is the baseline, so
+descenders sit at negative Y.
+
+Tolerance is the largest gap, in inches, between the flattened polyline and the
+true curve. Coarse 0.005", Normal 0.001", Fine 0.0002". Same number at any cap
+height. Use "Show points" zoomed in on one letter to judge which you need.
+
+
+Known limits in this build
+--------------------------
+
+- One line only. No wrapping, alignment, or line spacing.
+- Latin / Western European, left to right. Hebrew and Arabic are refused rather
+  than exported wrong.
+- Characters the font does not contain are dropped, and named in the warning
+  strip.
+- Overlapping glyphs are not merged. Script fonts and tightly kerned pairs emit
+  crossing outlines, which an even-odd CAM reader treats as holes.
+- No mirroring for face-down cutting.
+- Symbol fonts (Wingdings and friends) are listed with a warning icon. A typed
+  "A" gives you whatever that font maps A to.
+
+Check your font's licence before cutting its letterforms into anything you
+sell. GeomText does not check for you and cannot.
+
+
+Reporting a bug
+---------------
+
+File it here:
+
+    https://github.com/LemJukes/GeomText-pub/issues 
+
+Search first in case it is already open; otherwise click "New issue". No
+GitHub account? Email rob@rjgarner.com with the same information.
+
+Tell me:
+
+1.  What you did — the exact text you typed, the font family and style, the cap
+    height, and the tolerance. Those four values reproduce almost everything.
+2.  What you expected, and what happened instead. "The O has a flat spot on the
+    left" beats "curves look wrong".
+3.  Your Windows version, and the version shown by the About button at the
+    bottom left of the window.
+
+Attach, when they exist:
+
+- The DXF that came out wrong.
+- A screenshot of the window, including the warning strip under the preview.
+- The log file:  %LOCALAPPDATA%\GeomText\geomtext.log
+  Paste that path into the File Explorer address bar to find it. It records
+  crashes and any fonts that failed to load. It is plain text — read it first
+  if you would rather not send it.
+
+If GeomText crashed or would not open at all, the log file is the single most
+useful thing you can attach, because a windowed exe has nowhere else to put the
+error.
+
+Things worth reporting that may not feel like bugs: a font that is installed
+but missing from the picker, a font that is listed but fails to load, an export
+that takes absurdly long, geometry your CAM software rejects or reads as holes
+where it should read solid. Also say if something is merely confusing — the
+wording of a control is as fixable as the geometry behind it.
