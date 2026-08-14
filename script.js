@@ -57,6 +57,9 @@ window.addEventListener('resize', () => {
 
 // About Me page script
 document.addEventListener("DOMContentLoaded", function() {
+    const aboutTextElement = document.getElementById("aboutText");
+    if (!aboutTextElement) return; // Every page loads this script; only About has the tag
+
     fetch('aboutme.txt')
         .then(response => response.text())
         .then(text => {
@@ -85,10 +88,7 @@ document.addEventListener("DOMContentLoaded", function() {
             // Log the probability of the selected line
             console.log(`Line: "${selectedLine}" has a probability of ${selectedProbability.toFixed(2)}%`);
 
-            const aboutTextElement = document.getElementById("aboutText");
-            if (aboutTextElement) {
-                aboutTextElement.textContent = selectedLine;
-            }
+            aboutTextElement.textContent = selectedLine;
         })
         .catch(error => console.error('Error fetching aboutme.txt:', error));
 });

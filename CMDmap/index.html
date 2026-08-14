@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMDmap — Juke LTD. (Rob Garner)</title>
+    <meta name="description" content="CMDmap is a mind-map editor you drive from a command line, the way AutoCAD is. A free Windows application by Rob Garner (Juke LTD).">
+    <meta name="author" content="Rob Garner">
+    <link rel="canonical" href="https://jukeltd.com/CMDmap/">
+    <meta name="theme-color" content="#000000">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Juke LTD.">
+    <meta property="og:title" content="CMDmap — Juke LTD. (Rob Garner)">
+    <meta property="og:description" content="CMDmap is a mind-map editor you drive from a command line, the way AutoCAD is. A free Windows application by Rob Garner (Juke LTD).">
+    <meta property="og:url" content="https://jukeltd.com/CMDmap/">
+    <meta property="og:image" content="https://jukeltd.com/CMDmap/CMDmap-window.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CMDmap — Juke LTD. (Rob Garner)">
+    <meta name="twitter:description" content="CMDmap is a mind-map editor you drive from a command line, the way AutoCAD is. A free Windows application by Rob Garner (Juke LTD).">
+    <meta name="twitter:image" content="https://jukeltd.com/CMDmap/CMDmap-window.png">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="icon" href="../jukeLTDFavicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="../jukeLTDFavicon.png">
+</head>
+<body class="project-page">
+    <div id="orrery"></div>
+    <div class="content">
+        <h1 class="header">&lt; CMDmap &gt;</h1>
+        <p class="project-tagline">A mind-map editor you drive from a command line, the way AutoCAD is.</p>
+
+        <img src="CMDmap-window.png" alt="The CMDmap window: a dark grid canvas of labelled node boxes joined by lines, a command palette down the left edge, and a command line along the bottom." class="project-shot" width="1600" height="1000">
+
+        <div class="project-section">
+            <h2>What it is</h2>
+            <p>You type a short command, it asks for what it needs one prompt at a time, and it does the thing. Every command is also a labelled button in the palette on the left, generated from the command registry &mdash; so nothing is hidden behind knowledge you do not have yet, and nothing can be added to the application without appearing there.</p>
+            <p>A map is <strong>nodes</strong> and two kinds of edge. A node is a box with a label, and may carry a body of text as long as you like. Children are placed automatically around their parent on two rings &mdash; 8 slots inner, 16 outer, 24 children per node &mdash; and you can drag them anywhere afterwards; the line follows. The second edge kind is a <strong>cross-link</strong>, joining any two nodes across branches, drawn dim and dashed until something reveals it.</p>
+            <p>The command line is the only text-entry surface in the application. Every character you type goes there. There is no click-into-a-field, and there is nothing you can be stuck inside.</p>
+            <p>Windows 10/11, 64-bit. One file, nothing to install, no runtime to fetch.</p>
+        </div>
+
+        <div class="project-buttons">
+            <a href="https://github.com/LemJukes/CMDmap-pub/raw/main/dist/cmdmap-0.1.3-windows-x64.zip" class="nav-button" rel="noopener">Download CMDmap 0.1.3 (5.6 MB)</a>
+            <a href="https://github.com/LemJukes/CMDmap-pub" class="nav-button" rel="noopener">Source on GitHub</a>
+            <a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/QUICKSTART.md" class="nav-button" rel="noopener">Read the Quickstart</a>
+        </div>
+
+        <div class="project-section">
+            <h2>Running it</h2>
+            <p>Unzip <code>cmdmap-0.1.3-windows-x64.zip</code> anywhere and double-click <code>cmdmap.exe</code>. The zip carries the executable, the licence, and the four documents below. A <a href="https://github.com/LemJukes/CMDmap-pub/blob/main/dist/cmdmap-0.1.3-windows-x64.zip.sha256" rel="noopener">SHA-256</a> sits beside it in the repository.</p>
+            <div class="project-note">
+                <p>Windows will stop you the first time: &ldquo;Windows protected your PC&rdquo;. That is SmartScreen reacting to an unsigned exe &mdash; a code signing certificate is a recurring cost this alpha does not carry &mdash; not a virus warning. Click &ldquo;More info&rdquo;, then &ldquo;Run anyway&rdquo;.</p>
+            </div>
+            <p>Then read the <a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/QUICKSTART.md" rel="noopener">Quickstart</a>, which takes you from that first launch to a saved map without assuming you have ever used a command line for anything.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Three things that make it different</h2>
+            <p><strong>Peek.</strong> Type a command's name and <em>don't</em> press Enter. The prompt strip rehearses the entire sequence &mdash; every prompt, every bracket option, the default, and whether it is undoable &mdash; and runs nothing. Holding <code>Alt</code> over a palette button does the same. You can read a command before you commit to it.</p>
+            <p><strong>Greyed buttons say why.</strong> A command you cannot use right now is still in its usual place, greyed, carrying the precondition it is waiting for: <code>no node</code>, <code>no target</code>, <code>no link</code>. Buttons never move or reorder.</p>
+            <p><strong>It saves after every change.</strong> Every command that alters the map writes the file immediately, atomically. <code>SAVE</code> exists and you will rarely reach for it.</p>
+        </div>
+
+        <img src="CMDmap-peek.png" alt="CMDmap mid-peek: the typed command RP sits on the command line while the prompt strip above spells out its whole sequence, and the Edit palette tab shows two greyed commands labelled 'no link'." class="project-shot" width="1584" height="961">
+
+        <div class="project-section">
+            <h2>Your data</h2>
+            <p>Maps default to <code>Documents\cmdmap.json</code> &mdash; a folder you can find is worth more than a tidy one you cannot. The log, the recent-file list, and backups live in <code>%APPDATA%\cmdmap\config\</code>, because none of that is yours to manage. Backups keep the five previous generations of each map.</p>
+            <p>Type <code>VER</code> and the history pane prints the exact paths for the map you have open, which beats reading any table.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>What it deliberately is not</h2>
+            <p>These are choices with reasons, not gaps waiting to be filled.</p>
+            <ul>
+                <li><strong>No multi-select.</strong> Operating on several nodes goes through <em>scope</em> &mdash; <code>MOVE</code> and <code>DELETE</code> take the whole subtree by default, and <code>Shift</code> restricts them to the one node &mdash; rather than through building and maintaining a selection.</li>
+                <li><strong>No menus, no toolbars, no dialogs</strong> except the two file pickers Windows itself provides. The palette is the discovery surface.</li>
+                <li><strong>No animation.</strong> A zoom step is one frame.</li>
+                <li><strong>One map at a time.</strong> No tabs, no split view.</li>
+                <li><strong>No auto-layout, no themes, no plugins, no collaboration, no cloud.</strong> It is a local editor writing a local file.</li>
+                <li><strong>No export.</strong> Not to PNG, PDF, Markdown, OPML, or anything else. The file is plain JSON with a frozen shape, so writing your own converter is a small afternoon, and that is the current answer.</li>
+                <li><strong>Windows only.</strong> No macOS or Linux build exists or has been tested.</li>
+            </ul>
+        </div>
+
+        <div class="project-section">
+            <h2>Documentation</h2>
+            <ul>
+                <li><a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/QUICKSTART.md" rel="noopener">QUICKSTART</a> &mdash; first launch through a first map.</li>
+                <li><a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/COMMANDS.md" rel="noopener">COMMANDS</a> &mdash; all 25 commands: name, alias, chord, what each asks for.</li>
+                <li><a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/YOUR-DATA.md" rel="noopener">YOUR-DATA</a> &mdash; where your maps and backups live, and what the format promises.</li>
+                <li><a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/REPORTING.md" rel="noopener">REPORTING</a> &mdash; how to send a bug report that can be acted on.</li>
+                <li><a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/screenshots/MANUAL.md" rel="noopener">MANUAL</a> &mdash; the long version: every surface, every binding, with screenshots.</li>
+            </ul>
+        </div>
+
+        <div class="project-section">
+            <h2>The alpha</h2>
+            <p><strong>The file format is frozen until 30 September 2026.</strong> A map written by any 0.1.x build opens in any other, in both directions, and there is no migration step that can go wrong. The freeze is enforced by a test rather than by intention. That date is what keeps the freeze bounded &mdash; after it, the format may move.</p>
+            <p>Two things testers report that are expected rather than defects:</p>
+            <ul>
+                <li><strong>SmartScreen warns on first launch.</strong> Unsigned build. More info &rarr; Run anyway.</li>
+                <li><strong>A crash leaves no dialog.</strong> It writes the panic message, location and a backtrace to <code>cmdmap.log</code> and closes. That file is the report. A crash handler that tried to save your document could turn a crash into data loss, so it does not.</li>
+            </ul>
+        </div>
+
+        <div class="project-section">
+            <h2>Source</h2>
+            <p>CMDmap is open source under the MIT licence: <a href="https://github.com/LemJukes/CMDmap-pub" rel="noopener">github.com/LemJukes/CMDmap-pub</a>. Rust stable, Windows; <code>cargo build --release</code> and the toolchain is pinned. 425 unit tests and eight integration suites.</p>
+            <p>Built on egui / eframe, serde, ulid, rfd, directories, and thiserror.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Reporting a bug</h2>
+            <p>Email <a href="mailto:cmdev@jukeltd.com">cmdev@jukeltd.com</a>. <a href="https://github.com/LemJukes/CMDmap-pub/blob/main/docs/beta/REPORTING.md" rel="noopener">REPORTING.md</a> has the template; the short version is that typing <code>VER</code> and screenshotting the expanded history pane answers most of what a report needs in one step.</p>
+            <p>Attach <code>%APPDATA%\cmdmap\config\cmdmap.log</code>. It holds command names, outcomes and errors &mdash; not your node labels, not your body text. If the application closed on its own, the last lines of that file <em>are</em> the crash; send them exactly as they are, including the block of hexadecimal addresses at the end. Those resolve against the debug symbols kept for this build, so please do not trim them.</p>
+            <p>Say what you did in numbered steps, what you expected, what happened instead, and whether it happens every time or happened once. Feedback that is not a bug goes to the same address with &ldquo;feedback&rdquo; in the subject line.</p>
+        </div>
+
+        <p class="project-meta">Open alpha 0.1.3 &middot; Windows 10/11, 64-bit &middot; MIT licence</p>
+    </div>
+    <a href="../serious_projects.html" class="back-button">Back</a>
+    <script src="../script.js"></script>
+</body>
+</html>
