@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PartLayer — Juke LTD. (Rob Garner)</title>
+    <meta name="description" content="PartLayer is an AutoCAD plug-in that lays 3D sheet-goods parts flat and emits their cut profiles as 2D geometry. A free alpha for AutoCAD 2025/2026 by Rob Garner (Juke LTD).">
+    <meta name="author" content="Rob Garner">
+    <link rel="canonical" href="https://jukeltd.com/PartLayer/">
+    <meta name="theme-color" content="#000000">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Juke LTD.">
+    <meta property="og:title" content="PartLayer — Juke LTD. (Rob Garner)">
+    <meta property="og:description" content="PartLayer is an AutoCAD plug-in that lays 3D sheet-goods parts flat and emits their cut profiles as 2D geometry. A free alpha for AutoCAD 2025/2026 by Rob Garner (Juke LTD).">
+    <meta property="og:url" content="https://jukeltd.com/PartLayer/">
+    <meta property="og:image" content="https://jukeltd.com/jukeLTDFavicon.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="PartLayer — Juke LTD. (Rob Garner)">
+    <meta name="twitter:description" content="PartLayer is an AutoCAD plug-in that lays 3D sheet-goods parts flat and emits their cut profiles as 2D geometry. A free alpha for AutoCAD 2025/2026 by Rob Garner (Juke LTD).">
+    <meta name="twitter:image" content="https://jukeltd.com/jukeLTDFavicon.png">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="icon" href="../jukeLTDFavicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="../jukeLTDFavicon.png">
+</head>
+<body class="project-page">
+    <div id="orrery"></div>
+    <div class="content">
+        <h1 class="header">&lt; PartLayer &gt;</h1>
+        <p class="project-tagline">An AutoCAD plug-in that takes the sheet parts out of a 3D model and lays them flat, ready to cut.</p>
+
+        <div class="project-section">
+            <h2>What it is</h2>
+            <p>You model a scenic unit in 3D solids. Then somebody has to turn it into flat parts on a cut sheet, and that is an hour of rotating copies onto the XY plane by hand, one part at a time, getting the long axis the same way round each time.</p>
+            <p>PartLayer is the command that does it. Select the solids, pick a point. It works out which face of each solid is the <em>sheet</em> face, copies the part, rotates the copy flat onto <code>Z=0</code>, groups the copies, sorts each group largest-first, stacks them in columns, titles each one with its finished size, and emits the cut profile as 2D curves.</p>
+            <p>Your originals are never touched &mdash; it draws copies. One <code>U</code> reverses an entire run.</p>
+            <p>It stops at flat 2D geometry. Tooling, kerf, nesting and the actual CNC operation are downstream and deliberately not its job.</p>
+            <p>AutoCAD 2025 or 2026, Windows, 64-bit. AutoCAD LT cannot run it &mdash; LT has no .NET plug-in API.</p>
+        </div>
+
+        <div class="project-buttons">
+            <a href="https://github.com/LemJukes/PartLayer-pub/raw/main/dist/PartLayer-1.0.0-alpha.zip" class="nav-button" rel="noopener">Download PartLayer 1.0.0-alpha (44 KB)</a>
+            <a href="https://github.com/LemJukes/PartLayer-pub" class="nav-button" rel="noopener">Source on GitHub</a>
+            <a href="https://github.com/LemJukes/PartLayer-pub/blob/main/docs/alpha/INSTALL.md" class="nav-button" rel="noopener">Read the install guide</a>
+        </div>
+
+        <div class="project-section">
+            <h2>Installing</h2>
+            <p>Three steps, and the first one is the one that matters.</p>
+            <ol>
+                <li>Right-click the downloaded ZIP &rarr; Properties &rarr; tick <strong>Unblock</strong> &rarr; OK. <em>Before</em> you extract it.</li>
+                <li>Close AutoCAD. Copy the <code>PartLayer.bundle</code> folder out of the ZIP into <code>%APPDATA%\Autodesk\ApplicationPlugins\</code>.</li>
+                <li>Start AutoCAD and type <code>PTLVER</code>. It should print <code>PartLayer 1.0.0-alpha</code>.</li>
+            </ol>
+            <div class="project-note">
+                <p>Step 1 is not optional. Windows tags files downloaded from the internet, AutoCAD silently refuses to load a tagged DLL, and extracting a tagged ZIP copies the tag onto every file inside it. Skipping it is the single most common reason the plug-in appears to install and then does nothing at all &mdash; with no error message of any kind.</p>
+            </div>
+            <p>No installer, no <code>NETLOAD</code>, no registry keys. Uninstalling is deleting the folder. If <code>PTLVER</code> is not recognised, the <a href="https://github.com/LemJukes/PartLayer-pub/blob/main/docs/alpha/INSTALL.md" rel="noopener">install guide</a> works through the four causes in order; <code>INSTALL.txt</code> ships inside the ZIP and says the same thing.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Four commands</h2>
+            <ul>
+                <li><code>PTLINFO</code> &mdash; <strong>start here.</strong> Analyses a selection and reports what PartLayer makes of each solid: sheet face, length, width, thickness, and why it skipped anything it skipped. Draws nothing.</li>
+                <li><code>PTL</code> &mdash; the run. Select, pick a point, done. The point prompt also offers <code>SwitchStyle</code> and <code>Tune</code>.</li>
+                <li><code>-PTL</code> &mdash; the same run with all thirteen settings exposed as command-line keywords, for macros and toolbar buttons.</li>
+                <li><code>PTLVER</code> &mdash; print the version.</li>
+            </ul>
+            <p>Every command answers to a longer name as well &mdash; <code>PARTLAY</code>, <code>PARTLAYINFO</code>, <code>PARTLAYVER</code>, <code>-PARTLAY</code> &mdash; in case a shop alias has already taken the short one. Full keyword and template reference in <a href="https://github.com/LemJukes/PartLayer-pub/blob/main/docs/alpha/COMMANDS.md" rel="noopener">COMMANDS.md</a>.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>What a run produces</h2>
+            <p><strong>Cut profiles, by default.</strong> Each laid part's face is extracted to <code>LINE</code> / <code>ARC</code> / <code>ELLIPSE</code> / <code>SPLINE</code> curves on <code>PTL_CUT</code> for the outline and <code>PTL_CUT_INNER</code> for holes, and the laid solid is then erased. The curves are the product. The output entity type follows the source curve rather than flattening everything to polylines.</p>
+            <p><strong>On their own layers.</strong> <code>PTL_</code> plus the source layer name, by default &mdash; so a cut sheet is one layer filter away from the model it came from. You can keep the source layer instead, or send everything to one fixed layer.</p>
+            <p><strong>Grouped, sorted, titled.</strong> Parts group by a template that defaults to the source layer, sort largest-first inside each group, and stack in columns with a header. Each part gets a title from a template that defaults to index, then length by width in the drawing's current units.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>What it deliberately is not</h2>
+            <p>These are decisions with reasons, not gaps waiting to be filled.</p>
+            <ul>
+                <li><strong>Flat sheet stock only.</strong> Angled edges, dados and arbitrary non-sheet geometry are out of scope. A solid it cannot read is reported by handle and skipped; the rest of the run still lays out.</li>
+                <li><strong>No nesting.</strong> Parts stack in columns for legibility, not packed for yield.</li>
+                <li><strong>No tooling, no kerf, no toolpaths.</strong> The output is geometry. What cuts it is a downstream problem, on purpose.</li>
+                <li><strong>No ribbon, no toolbar, no dialogs.</strong> The commands are typed. <code>-PTL</code> is the one to hang a button on.</li>
+                <li><strong>No chirality tracking.</strong> Turning a panel over mirrors its outline. That is intended, not a bug to report.</li>
+                <li><strong>AutoCAD 2025 and 2026 only.</strong> On any other release the bundle is correctly ignored, and ignored silently.</li>
+            </ul>
+        </div>
+
+        <div class="project-section">
+            <h2>The alpha</h2>
+            <p>It is in daily use by its author on real production drawings. It has not been through many hands, which is the whole reason it is here.</p>
+            <ul>
+                <li><strong>Work on a copy</strong> of any drawing you care about, or save before running <code>PTL</code>.</li>
+                <li><strong>Rotation on L-shaped and other asymmetric parts</strong> is chosen by a heuristic and will sometimes look wrong. Known, and not fixable from inside the drawing yet.</li>
+                <li><strong>The install can fail silently.</strong> See the note above. If nothing happens, it is almost always the zone marker.</li>
+            </ul>
+            <p>A sample drawing that exercises the command sits in the repository at <code>samples/panels.dwg</code>.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Reporting a bug</h2>
+            <p>Email <a href="mailto:rob@rjgarner.com">rob@rjgarner.com</a> with &ldquo;PartLayer&rdquo; in the subject. <a href="https://github.com/LemJukes/PartLayer-pub/blob/main/docs/alpha/REPORTING.md" rel="noopener">REPORTING.md</a> has the detail; the short version is that <strong>a report is useful roughly in proportion to whether the geometry came with it</strong>. If a part comes out wrong, the solid that produced it is worth more than any description of it &mdash; and one exploded copy of that solid in a blank drawing is enough.</p>
+            <p>If the plug-in will not load at all, send three things and nothing else is needed: the output of <code>TRUSTEDPATHS</code>, your AutoCAD version from the ABOUT box, and a screenshot of the <code>PartLayer.bundle</code> folder.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Source</h2>
+            <p>Source is published at <a href="https://github.com/LemJukes/PartLayer-pub" rel="noopener">github.com/LemJukes/PartLayer-pub</a>. C# on .NET 8; <code>PartLayer.Core</code> is pure geometry and layout math with no AutoCAD references and carries the test suite, <code>PartLayer.Cad</code> is everything that touches AutoCAD. <code>dotnet build</code> and <code>dotnet test</code>; AutoCAD itself is not needed to build.</p>
+            <p><strong>Not open source yet, deliberately.</strong> All rights reserved, with an explicit grant to download, install, use &mdash; including commercially &mdash; and build this alpha. A permissive licence cannot be retracted from code already published under it, so the alpha starts at the end that leaves the decision open. Exact terms in <a href="https://github.com/LemJukes/PartLayer-pub/blob/main/NOTICE.md" rel="noopener">NOTICE.md</a>.</p>
+            <p>None of Autodesk's code is redistributed. The two DLLs in the package are the whole payload and both are this project's own.</p>
+            <p>Disclaimer: the majority of this source code was generated by AI/LLM tooling; all design decisions and responsibility for the software rest solely with the developer.</p>
+        </div>
+
+        <p class="project-meta">Alpha 1.0.0 &middot; AutoCAD 2025/2026, Windows 64-bit &middot; All rights reserved</p>
+    </div>
+    <a href="../projects.html" class="back-button">Back</a>
+    <script src="../script.js"></script>
+</body>
+</html>
