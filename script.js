@@ -93,21 +93,85 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(error => console.error('Error fetching aboutme.txt:', error));
 });
 
-// KACS nav popup toggle
+// Nav trays — a nav button that holds a set of links and pops them out. Opens
+// on hover where there is a real cursor, and on tap/click everywhere. Trays can
+// nest (Games holds K.A.C.S., which holds its own links).
 document.addEventListener("DOMContentLoaded", function() {
-    const toggle = document.querySelector(".kacs-toggle");
-    const popup = document.querySelector(".kacs-popup");
-    if (!toggle || !popup) return;
+    const trays = Array.from(document.querySelectorAll(".nav-tray"));
+    if (trays.length === 0) return;
 
-    toggle.addEventListener("click", function(event) {
-        event.stopPropagation();
-        popup.classList.toggle("open");
+    const canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+    // A tray the cursor opened closes again when the cursor leaves. Clicking one
+    // latches it open instead, so it survives the mouse wandering off.
+    const hoverOpened = new WeakSet();
+
+    function setOpen(tray, open) {
+        tray.classList.toggle("open", open);
+        const toggle = tray.querySelector(":scope > .tray-toggle");
+        if (toggle) toggle.setAttribute("aria-expanded", String(open));
+        if (!open) {
+            hoverOpened.delete(tray);
+            tray.querySelectorAll(".nav-tray.open").forEach(sub => setOpen(sub, false));
+        }
+    }
+
+    // Only trays sharing a container close each other, so opening a nested tray
+    // leaves the one holding it open.
+    function closeSiblings(tray) {
+        Array.from(tray.parentElement.children).forEach(sibling => {
+            if (sibling !== tray && sibling.classList.contains("nav-tray")) {
+                setOpen(sibling, false);
+            }
+        });
+    }
+
+    function closeAll() {
+        trays.forEach(tray => setOpen(tray, false));
+    }
+
+    trays.forEach(tray => {
+        const toggle = tray.querySelector(":scope > .tray-toggle");
+        if (!toggle) return;
+
+        toggle.addEventListener("click", function(event) {
+            event.stopPropagation();
+            if (!tray.classList.contains("open")) {
+                closeSiblings(tray);
+                setOpen(tray, true);
+                return;
+            }
+            // The cursor got here first and opened it; this click means keep it.
+            if (hoverOpened.has(tray)) {
+                hoverOpened.delete(tray);
+                return;
+            }
+            setOpen(tray, false);
+        });
+
+        if (canHover) {
+            tray.addEventListener("mouseenter", function() {
+                closeSiblings(tray);
+                if (tray.classList.contains("open")) return;
+                setOpen(tray, true);
+                hoverOpened.add(tray);
+            });
+            tray.addEventListener("mouseleave", function() {
+                if (hoverOpened.has(tray)) setOpen(tray, false);
+            });
+        }
     });
 
     document.addEventListener("click", function(event) {
-        if (!popup.contains(event.target) && event.target !== toggle) {
-            popup.classList.remove("open");
-        }
+        if (!event.target.closest(".nav-tray")) closeAll();
+    });
+
+    document.addEventListener("keydown", function(event) {
+        if (event.key !== "Escape") return;
+        const openTray = document.querySelector(".nav-tray.open");
+        if (!openTray) return;
+        closeAll();
+        const toggle = openTray.querySelector(":scope > .tray-toggle");
+        if (toggle) toggle.focus();
     });
 });
-

@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Projects — Juke LTD. (Rob Garner)</title>
-    <meta name="description" content="Projects by Rob Garner (Juke LTD), including ASCII Farmer, Verbatempus, the Keyboard Access Control System, and writing.">
+    <meta name="description" content="Projects by Rob Garner (Juke LTD) — utilities like GeomText, CMDmap and Verbatempus, games like ASCII Farmer and K.A.C.S., plus silly things and writing.">
     <link rel="canonical" href="https://jukeltd.com/projects.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Juke LTD.">
     <meta property="og:title" content="Projects — Juke LTD. (Rob Garner)">
-    <meta property="og:description" content="Projects by Rob Garner (Juke LTD), including ASCII Farmer, Verbatempus, the Keyboard Access Control System, and writing.">
+    <meta property="og:description" content="Projects by Rob Garner (Juke LTD) — utilities like GeomText, CMDmap and Verbatempus, games like ASCII Farmer and K.A.C.S., plus silly things and writing.">
     <meta property="og:url" content="https://jukeltd.com/projects.html">
     <meta property="og:image" content="https://jukeltd.com/jukeLTDFavicon.png">
     <link rel="stylesheet" href="styles.css">
@@ -20,8 +20,37 @@
     <div class="content">
         <h1 class="header">< Projects ></h1>
         <nav class="navbar">
-            <a href="serious_projects.html" class="nav-button">Serious Projects</a>
-            <a href="silly_projects.html" class="nav-button">Silly Projects</a>
+            <div class="nav-tray">
+                <button type="button" class="nav-button tray-toggle" aria-expanded="false" aria-controls="tray-utilities">Utilities<span class="tray-caret" aria-hidden="true"></span></button>
+                <div class="tray-items" id="tray-utilities">
+                    <a href="GeomText/index.html" class="nav-button tray-item">GeomText</a>
+                    <a href="CMDmap/index.html" class="nav-button tray-item">CMDmap</a>
+                    <a href="https://verbatempus.com" class="nav-button tray-item">Verbatempus: A Clock full of Words</a>
+                </div>
+            </div>
+            <div class="nav-tray">
+                <button type="button" class="nav-button tray-toggle" aria-expanded="false" aria-controls="tray-games">Games<span class="tray-caret" aria-hidden="true"></span></button>
+                <div class="tray-items" id="tray-games">
+                    <a href="https://asciifarmer.com" class="nav-button tray-item">ASCII Farmer</a>
+                    <div class="nav-tray nav-tray--sub tray-item">
+                        <button type="button" class="nav-button tray-toggle" aria-expanded="false" aria-controls="tray-kacs">K.A.C.S. &mdash; Keyboard Access Control System<span class="tray-caret tray-caret--side" aria-hidden="true"></span></button>
+                        <div class="tray-items tray-items--side" id="tray-kacs">
+                            <a href="K.A.C.S.-Keyboard-Access-Control-System/index.html" class="nav-button tray-item">Juke LTD Version</a>
+                            <a href="https://lemjukes.itch.io/kacs" class="nav-button tray-item itch-link">Play on itch.io</a>
+                            <div class="itch-embed tray-item">
+                                <iframe frameborder="0" src="https://itch.io/embed/4728889?dark=true" width="552" height="167" title="K.A.C.S. on itch.io"><a href="https://lemjukes.itch.io/kacs">K.A.C.S. - A Game Where Typing Could Save The World by Lem Jukes</a></iframe>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="nav-tray">
+                <button type="button" class="nav-button tray-toggle" aria-expanded="false" aria-controls="tray-silly">Silly Things<span class="tray-caret" aria-hidden="true"></span></button>
+                <div class="tray-items" id="tray-silly">
+                    <a href="SGItsJustBaseball.html" class="nav-button tray-item">It's Just Baseball (Scratch Game)</a>
+                    <a href="three-body-sim/index.html" class="nav-button tray-item">Three-Body Simulator</a>
+                </div>
+            </div>
             <a href="writing.html" class="nav-button">Writing</a>
         </nav>
     </div>
