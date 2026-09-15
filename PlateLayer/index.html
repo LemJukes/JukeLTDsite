@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlateLayer — Juke LTD. (Rob Garner)</title>
+    <meta name="description" content="PlateLayer is an AutoCAD plug-in that turns a CNC cut layout into paper-space plates — one viewport per part, grouped by material, labelled and dimensioned. A free alpha for AutoCAD 2026 by Rob Garner (Juke LTD).">
+    <meta name="author" content="Rob Garner">
+    <link rel="canonical" href="https://jukeltd.com/PlateLayer/">
+    <meta name="theme-color" content="#000000">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Juke LTD.">
+    <meta property="og:title" content="PlateLayer — Juke LTD. (Rob Garner)">
+    <meta property="og:description" content="PlateLayer is an AutoCAD plug-in that turns a CNC cut layout into paper-space plates — one viewport per part, grouped by material, labelled and dimensioned. A free alpha for AutoCAD 2026 by Rob Garner (Juke LTD).">
+    <meta property="og:url" content="https://jukeltd.com/PlateLayer/">
+    <meta property="og:image" content="https://jukeltd.com/jukeLTDFavicon.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="PlateLayer — Juke LTD. (Rob Garner)">
+    <meta name="twitter:description" content="PlateLayer is an AutoCAD plug-in that turns a CNC cut layout into paper-space plates — one viewport per part, grouped by material, labelled and dimensioned. A free alpha for AutoCAD 2026 by Rob Garner (Juke LTD).">
+    <meta name="twitter:image" content="https://jukeltd.com/jukeLTDFavicon.png">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="icon" href="../jukeLTDFavicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="../jukeLTDFavicon.png">
+</head>
+<body class="project-page">
+    <div id="orrery"></div>
+    <div class="content">
+        <h1 class="header">&lt; PlateLayer &gt;</h1>
+        <p class="project-tagline">An AutoCAD plug-in that turns a CNC cut layout into paper-space plates &mdash; one viewport per part, grouped by material, labelled and dimensioned.</p>
+
+        <div class="project-section">
+            <h2>What it is</h2>
+            <p>You have a cut file: a model space full of flat parts, grouped onto layers by material, ready for the CNC. Somebody still has to make the sheet the person at the saw actually reads &mdash; every part drawn at a known scale, with its finished dimensions on it, sorted so you can find the one in your hand.</p>
+            <p>PlateLayer is the command that does it. Select the part geometry, look at the plan, say yes. It groups the parts by material, measures every one, picks one scale per plate, packs them into tiles, clones your ANSI B layout once per plate, and draws each part in its own viewport with an X and a Y dimension.</p>
+            <p>What comes off the printer is a catalogue you carry to the saw.</p>
+            <p>It takes flat 2D geometry and stops at paper. It does not nest, does not cut, and does not optimise yield &mdash; a plate is for reading, not for feeding a machine. Downstream of <a href="../PartLayer/index.html">PartLayer</a>, which is what flattens the 3D solids into the parts this reads.</p>
+            <p>AutoCAD 2026, Windows, 64-bit. AutoCAD LT cannot run it &mdash; LT has no .NET plug-in API.</p>
+        </div>
+
+        <div class="project-buttons">
+            <a href="https://github.com/LemJukes/PlateLayer-pub/raw/main/dist/PlateLayer-Alpha-1.4.zip" class="nav-button" rel="noopener">Download PlateLayer Alpha 1.4 (53 KB)</a>
+            <a href="https://github.com/LemJukes/PlateLayer-pub" class="nav-button" rel="noopener">Source on GitHub</a>
+            <a href="https://github.com/LemJukes/PlateLayer-pub/blob/main/docs/alpha/INSTALL.md" class="nav-button" rel="noopener">Read the install guide</a>
+        </div>
+
+        <div class="project-section">
+            <h2>Installing</h2>
+            <p>Three steps, and the first one is the one that matters.</p>
+            <ol>
+                <li>Right-click the downloaded ZIP &rarr; Properties &rarr; tick <strong>Unblock</strong> &rarr; OK. <em>Before</em> you extract it.</li>
+                <li>Close AutoCAD. Copy the <code>PlateLayer.bundle</code> folder out of the ZIP into <code>%APPDATA%\Autodesk\ApplicationPlugins\</code>.</li>
+                <li>Start AutoCAD and type <code>PLLSET</code>. Its first line should read <code>PlateLayer Alpha 1.4</code>.</li>
+            </ol>
+            <div class="project-note">
+                <p>Step 1 is not optional. Windows tags files downloaded from the internet, AutoCAD silently refuses to load a tagged DLL, and extracting a tagged ZIP copies the tag onto every file inside it. Skipping it is the single most common reason the plug-in appears to install and then does nothing at all &mdash; with no error message of any kind.</p>
+            </div>
+            <p>No installer, no <code>NETLOAD</code>, no registry keys. Uninstalling is deleting the folder. If <code>PLLSET</code> is not recognised, the <a href="https://github.com/LemJukes/PlateLayer-pub/blob/main/docs/alpha/INSTALL.md" rel="noopener">install guide</a> works through the causes in order; <code>INSTALL.txt</code> ships inside the ZIP and says the same thing.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Two commands, and a dry run</h2>
+            <ul>
+                <li><code>PLL</code> &mdash; the run. Select the geometry, read the plan, generate plates with per-plate approval. Answers to <code>PLATELAYER</code> as well.</li>
+                <li><code>PLLSET</code> &mdash; template layout, parts per plate, scale policy, dimension style, margins, material names, approval mode. Saved into the drawing rather than your profile, so a drawing you send somebody carries its own settings and none of yours.</li>
+            </ul>
+            <p><strong>Answer <code>No</code> at the Proceed prompt the first time.</strong> That is a dry run: the plan prints to the text window and the drawing is not touched. It tells you how many plates you are about to get, at what scale, how full each one will be, what geometry it ignored and on what layer &mdash; and which constraint decided the plate count. That last line is the one worth reading.</p>
+            <p>Full keyword and convention reference in <a href="https://github.com/LemJukes/PlateLayer-pub/blob/main/docs/alpha/COMMANDS.md" rel="noopener">COMMANDS.md</a>.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>What lands on a plate</h2>
+            <p><strong>One part per viewport, an X dimension, a Y dimension, and nothing else.</strong> Fractions are written as MText stacks, so a plug-in-drawn dimension reads the same as one typed by hand.</p>
+            <p><strong>The sheet identifies itself through the title block.</strong> Plate name, the material expanded from its layer &mdash; <code>3/4" Plywood | rPLY_3-4</code> &mdash; the run date, and <code>nn of NN</code>. Those four, and nothing else: project name, client, producer, draftsperson, approved-by and notes belong to whoever set the drawing up, and pointing a configured field at one of them is refused rather than obeyed.</p>
+            <p><strong>No scale is printed anywhere.</strong> The dimensions carry the real measurements, which is the information a person on the floor actually needs.</p>
+            <p>Per-part index labels were built and then removed: on a part under about an inch of plotted height the vertical dimension text sits at the same height as the label and lands on top of it.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Why it gave you that many sheets</h2>
+            <p>The interesting problem in a tool like this is not drawing the parts. It is answering &ldquo;why so many sheets&rdquo; on the page instead of leaving it to be guessed at.</p>
+            <p><strong>One plate per material is a floor nothing crosses.</strong> Eight materials means eight plates under every setting. That is deliberate &mdash; a catalogue sheet you carry to the saw should describe the sheet of stock you are cutting &mdash; and only mixing materials on a plate would change it, which throws away the grouping the tool exists to produce.</p>
+            <p><strong>Past that floor it is usually the parts-per-plate cap, not the scale.</strong> That was a measured finding, not a guess: across real and synthetic runs, coarsening the scale had already reached the fewest sheets the cap permitted, every time. So the <code>Minimum</code> policy sets the cap aside rather than just coarsening harder &mdash; and the run summary names whichever constraint was actually holding.</p>
+            <p><strong>The legibility floor measures the typical part, not the smallest.</strong> A cut file holds 2&Prime; strips and scored lines beside five-foot panels. Measured on the smallest part the floor is unreachable at any scale that fits, so it never operates and coarsening runs away &mdash; one material reached 1:64 with 21 parts on a sheet before this changed. Measured on the median short side it caps that material at two readable sheets. One strip should not speak for twenty-one parts.</p>
+            <p><strong>And some sheets are honestly empty.</strong> A material holding two small parts cannot fill a sheet, and splitting them across two plates at a finer scale is worse, not better. Every plate states its fill in the dry run and anything under 35% is named, so a sparse sheet is a decision you have seen rather than a surprise on paper.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>What it takes from your drawing</h2>
+            <p>Layers, layout and title block come from your own template rather than being invented. It expects a layout tab named <code>ANSI B</code> &mdash; resolution is forgiving, and a miss names the layouts that do exist rather than just refusing &mdash; viewport frames on <code>rVIEWPORTS</code>, dimensions on <code>rDIMS_PAPER</code>, and the usual title block attribute tags.</p>
+            <p>Material names are read off the layer: optional prefix, code, thickness written as <code>3-4</code>, optional qualifier. The raw layer name is always kept beside the translation, because that is the string someone cross-referencing the cut file will search for. An unrecognised code is named in the run summary rather than guessed at &mdash; input to this tool is sheet goods by contract, so it means either a sheet good missing from the table or geometry that should not have been in the run.</p>
+            <p>Layers it has to create because the drawing lacks them are reported at the end of a run, because a missing convention layer means the drawing was not built from the usual template and the new layer's colour and plot settings are guesses.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>What it deliberately is not</h2>
+            <p>These are decisions with reasons, not gaps waiting to be filled.</p>
+            <ul>
+                <li><strong>No nesting, no yield optimisation.</strong> Parts are tiled for legibility. Cut optimisation is a different tool's job.</li>
+                <li><strong>No tooling, no kerf, no toolpaths.</strong> The output is a drawing to read, not a program to run.</li>
+                <li><strong>No mixed-material plates.</strong> One material per plate is the point of the tool, not a limitation of it.</li>
+                <li><strong>No rotation-aware packing.</strong> Parts are tiled at the orientation they arrive in.</li>
+                <li><strong>No plot or PDF export.</strong> You plot the layouts yourself, the way you plot everything else.</li>
+                <li><strong>No ribbon, no toolbar, no dialogs.</strong> The commands are typed.</li>
+                <li><strong>AutoCAD 2026 only.</strong> On any other release the bundle is correctly ignored, and ignored silently.</li>
+            </ul>
+        </div>
+
+        <div class="project-section">
+            <h2>The alpha</h2>
+            <p>It is in use by its author on real cut files. It has not been through many hands, which is the whole reason it is here.</p>
+            <ul>
+                <li><strong>Work on a copy</strong> of any drawing you care about.</li>
+                <li><strong>Run the dry run first.</strong> It is free, it changes nothing, and it is the whole plan.</li>
+                <li><strong>Read the ignored-layer report.</strong> A material drawn on the wrong layer upstream is exactly what it catches, and that has already happened once on a real file &mdash; a whole material's worth of parts, silently absent from the run.</li>
+                <li><strong>The approval loop and the error handling</strong> have not been exercised hard against production files. That is the main reason this is 1.4 and not 1.0 proper.</li>
+            </ul>
+        </div>
+
+        <div class="project-section">
+            <h2>Reporting a bug</h2>
+            <p>Email <a href="mailto:rob@rjgarner.com">rob@rjgarner.com</a> with &ldquo;PlateLayer&rdquo; in the subject. <a href="https://github.com/LemJukes/PlateLayer-pub/blob/main/docs/alpha/REPORTING.md" rel="noopener">REPORTING.md</a> has the detail; the short version is <strong>attach the drawing, and paste the dry-run text</strong>. Most reports about plate counts and scales are answered by that text alone, and it costs nothing to produce.</p>
+            <p>If the plug-in will not load at all, send three things and nothing else is needed: the output of <code>TRUSTEDPATHS</code>, your AutoCAD version from the ABOUT box, and a screenshot of the <code>PlateLayer.bundle</code> folder.</p>
+        </div>
+
+        <div class="project-section">
+            <h2>Source</h2>
+            <p>Source is published at <a href="https://github.com/LemJukes/PlateLayer-pub" rel="noopener">github.com/LemJukes/PlateLayer-pub</a>. C# on .NET 8; <code>PlateLayer.Core</code> is grouping, measuring, scale, packing and planning with no AutoCAD references and carries the test suite, <code>PlateLayer.Cad</code> is everything that touches AutoCAD. The moment a Core test needs AutoCAD to run, the logic under test is in the wrong assembly.</p>
+            <p>Building the plug-in needs AutoCAD 2026 installed, because <code>PlateLayer.Cad</code> references its managed assemblies in place. The Core tests do not &mdash; <code>dotnet test</code> on them works on a machine that has never had AutoCAD on it.</p>
+            <p><strong>Not open source yet, deliberately.</strong> All rights reserved, with an explicit grant to download, install, use &mdash; including commercially &mdash; and build this alpha. A permissive licence cannot be retracted from code already published under it, so the alpha starts at the end that leaves the decision open. Exact terms in <a href="https://github.com/LemJukes/PlateLayer-pub/blob/main/NOTICE.md" rel="noopener">NOTICE.md</a>.</p>
+            <p>None of Autodesk's code is redistributed. The two DLLs in the package are the whole payload and both are this project's own.</p>
+            <p>Disclaimer: the majority of this source code was generated by AI/LLM tooling; all design decisions and responsibility for the software rest solely with the developer.</p>
+        </div>
+
+        <p class="project-meta">Alpha 1.4 &middot; AutoCAD 2026, Windows 64-bit &middot; All rights reserved</p>
+    </div>
+    <a href="../projects.html" class="back-button">Back</a>
+    <script src="../script.js"></script>
+</body>
+</html>

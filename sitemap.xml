@@ -12,7 +12,7 @@
   </url>
   <url>
     <loc>https://jukeltd.com/projects.html</loc>
-    <lastmod>2026-09-11</lastmod>
+    <lastmod>2026-09-15</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
@@ -38,6 +38,11 @@
   <url>
     <loc>https://jukeltd.com/PartLayer/</loc>
     <lastmod>2026-09-11</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://jukeltd.com/PlateLayer/</loc>
+    <lastmod>2026-09-15</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
