@@ -2,11 +2,14 @@
 //
 // Pure DOM. It talks to a controller object (`app`, created in main.js) through a
 // small command surface (play/pause/reset/loadPreset/selectBody/...) and pulls
-// live numbers back each frame via app.getReadouts(). No Three.js or physics here.
+// live numbers back each frame via app.getReadouts(). No Three.js or physics here
+// (only the plain-data look and shape tables are imported, to label the controls).
 
 import { presets, presetOrder, COLORS } from './presets.js';
 import { THEMES, themeOrder } from './themes.js';
 import { hasIcon, iconSvg } from './icons.js';
+import { LOOKS } from './bodyLooks.js';
+import { SHAPE_STOPS, DICE_MAX, stopFor } from './shapes.js';
 
 // ---- tiny DOM helpers -------------------------------------------------------
 
@@ -339,6 +342,44 @@ export function createUI(app) {
     mk('Vel Y', 'vy', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the Y axis' }),
     mk('Vel Z', 'vz', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the Z axis (depth)' }),
   ]);
+  // ---- look: what the selected body looks like (cosmetic only, never touches the simulation) ----
+  const SHAPE_TIP = 'Shape of the round body. Snaps to fixed stops: the dice solids, then geodesic spheres, then a smooth ball. Cosmetic only.';
+  const DICE_TIP = 'Number the faces like a real die: opposite faces add up to one more than the face count (d4 is read at the corners, d10 runs 0-9).';
+  const shapeS = slider('Shape', { min: 0, max: 100, step: 10, value: 60, format: (v) => stopFor(v).short, tip: SHAPE_TIP },
+    (v) => { app.setLook(editIndex, { shape: v }); syncLook(); });
+  shapeS.row.classList.add('stops-slider');
+  const shapeCaption = el('div', { class: 'shape-caption' });
+  shapeS.row.append(
+    el('div', { class: 'stops', 'aria-hidden': 'true' }, SHAPE_STOPS.map(() => el('span'))),
+    shapeCaption,
+  );
+  const diceT = toggle('Dice faces', false, (v) => { app.setLook(editIndex, { dice: v }); syncLook(); }, DICE_TIP);
+  const lookBox = el('div', { class: 'custom-body look-box' }, [
+    el('div', { class: 'custom-body-title', text: 'Look' }),
+    shapeS.row,
+    diceT.node,
+  ]);
+
+  // Show the selected body's look in the controls, greying out what does not apply to it.
+  function syncLook() {
+    const look = app.looks[editIndex];
+    const def = LOOKS[look.object];
+    const stop = stopFor(look.shape);
+    shapeS.set(look.shape);
+    shapeCaption.textContent = [stop.label, stop.die, stop.faces].filter(Boolean).join(' · ');
+    const hasShape = def.usesDetail;
+    shapeS.input.disabled = !hasShape;
+    shapeS.row.classList.toggle('disabled', !hasShape);
+    shapeS.row.setAttribute('data-tip', hasShape ? SHAPE_TIP : `The ${def.label} look has a fixed shape, so there is nothing to choose.`);
+    const diceOk = hasShape && stop.value <= DICE_MAX;
+    diceT.input.checked = !!look.dice;
+    diceT.input.disabled = !diceOk;
+    diceT.node.classList.toggle('disabled', !diceOk);
+    diceT.node.setAttribute('data-tip', diceOk ? DICE_TIP
+      : hasShape ? 'Dice faces need a flat-faced shape: tetrahedron through icosahedron.'
+        : `The ${def.label} look has no flat faces to number.`);
+  }
+
   const editorHead = el('div', { class: 'section-title' }, [
     el('span', { class: 'section-arrow', text: '▾' }),
     el('span', { text: 'Selected Body' }),
@@ -349,6 +390,7 @@ export function createUI(app) {
       el('div', { class: 'editor-hint', text: 'Click a body in the scene, or pick one:' }),
       bodySelRow,
       editorBody,
+      lookBox,
     ]),
   ]);
   editorHead.addEventListener('click', () => editorSection.classList.toggle('collapsed'));
@@ -574,8 +616,11 @@ export function createUI(app) {
       editSel.px.set(cfg.pos.x); editSel.py.set(cfg.pos.y); editSel.pz.set(cfg.pos.z);
       editSel.vx.set(cfg.vel.x); editSel.vy.set(cfg.vel.y); editSel.vz.set(cfg.vel.z);
       bodySelBtns.forEach((b, k) => b.classList.toggle('active', k === i));
+      syncLook();
       editorSection.classList.remove('hidden');
     },
+    // re-read the selected body's look (after an import, or applying one look to every body)
+    syncLook() { if (editIndex >= 0) syncLook(); },
     hideBodyEditor() {
       editorSection.classList.add('hidden');
       bodySelBtns.forEach((b) => b.classList.remove('active'));

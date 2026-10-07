@@ -30,10 +30,10 @@
 // To add a look: add an entry to LOOKS below. It appears in the Object menu automatically.
 
 import * as THREE from 'three';
+import { SHAPE_DEFAULT, DICE_MAX, HULL_FROM, stopFor, buildShapeGeometry, diceSegments } from './shapes.js';
 
 // ---- settings ---------------------------------------------------------------
 
-export const SHAPE_DEFAULT = 60;   // geodesic, detail 1: the original body
 export const MOONLET_MAX = 4;
 
 export const DEFAULT_LOOK = Object.freeze({
@@ -113,18 +113,139 @@ export function makeTracker() {
  * the Lab Notebook style a pencil stroke. Everything it creates is registered with the tracker.
  */
 export function makeKit(theme, tracker) {
+  const material = (m) => tracker.own(m);
   return {
     theme,
     additive: !!theme.additive,
     lit: false, // no shipped style does lighting, so looks skip shadows
     geometry: (key, factory) => tracker.geometry(key, factory),
 
-    /** Wireframe of `geometry` in `color`. */
+    /** Every triangle of `geometry` as a line: the original body look. */
     wire(geometry, color) {
-      const mesh = new THREE.Mesh(geometry, tracker.own(new THREE.MeshBasicMaterial({ color, wireframe: true })));
+      return new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({ color, wireframe: true })));
+    },
+
+    /** The true polyhedron edges of `geometry` (no diagonals across flat faces). */
+    edges(geometry, color) {
+      return new THREE.LineSegments(
+        tracker.own(new THREE.EdgesGeometry(geometry, 1)),
+        material(new THREE.LineBasicMaterial({ color })),
+      );
+    },
+
+    /** Loose line segments from a flat [x, y, z, x, y, z, ...] list (every two points make one). */
+    lines(positions, color) {
+      const geometry = tracker.own(new THREE.BufferGeometry());
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      return new THREE.LineSegments(geometry, material(new THREE.LineBasicMaterial({ color })));
+    },
+
+    /**
+     * An invisible solid that still hides whatever is behind it: it writes depth but no colour, so lines
+     * on its far side (and the grid, trails and bodies behind it) are cut out. Drawn first, and pushed
+     * back a little so lines lying on its surface win.
+     */
+    occluder(geometry) {
+      const mesh = new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({
+        colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+      })));
+      mesh.renderOrder = -0.5;
       return mesh;
     },
+
+    /**
+     * A solid ball with a crisp outline of constant pixel width: a fill in the page colour with a
+     * back-face hull behind it, pushed outward in clip space. Reads as a smooth circle however fine
+     * the mesh, and solid ink survives the 1-bit dither where a dense wireframe would clot.
+     */
+    outlined(geometry, color) {
+      const group = new THREE.Group();
+      const fill = new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({
+        color: theme.background, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+      })));
+      fill.renderOrder = -0.5;
+      const hullMat = material(new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        uniforms: { uColor: { value: new THREE.Color(color) }, uPx: { value: 2 }, uViewport: { value: new THREE.Vector2(1, 1) } },
+        vertexShader: /* glsl */`
+          uniform float uPx;
+          uniform vec2 uViewport;
+          void main() {
+            vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            vec3 n = normalize(normalMatrix * normal);
+            vec2 dir = (projectionMatrix * vec4(n, 0.0)).xy;
+            dir = length(dir) > 1e-6 ? normalize(dir) : vec2(0.0);
+            clip.xy += dir * (uPx * 2.0 / uViewport) * clip.w;
+            gl_Position = clip;
+          }`,
+        fragmentShader: /* glsl */`
+          uniform vec3 uColor;
+          void main() { gl_FragColor = vec4(uColor, 1.0); }`,
+      }));
+      const hull = new THREE.Mesh(geometry, hullMat);
+      hull.renderOrder = -0.5;
+      // line width in buffer pixels: 2 screen pixels in the pixel-grid styles, else 1.5 CSS pixels
+      hull.onBeforeRender = (renderer) => {
+        const target = renderer.getRenderTarget();
+        if (target) hullMat.uniforms.uViewport.value.set(target.width, target.height);
+        else renderer.getDrawingBufferSize(hullMat.uniforms.uViewport.value);
+        hullMat.uniforms.uPx.value = theme.pixelRatio === 'unit' ? 2 : 1.5 * renderer.getPixelRatio();
+      };
+      group.add(fill, hull);
+      return group;
+    },
   };
+}
+
+// ---- round cores ------------------------------------------------------------
+
+// Three great circles on the unit sphere as line segments: the equator of the spin and two meridians
+// through its poles. The meridians sweep as the body turns, so an outlined sphere still looks like it
+// spins.
+function contourLines(spinAxis) {
+  const a = spinAxis.clone().normalize();
+  const p = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(a.x) > 0.9) p.set(0, 1, 0);
+  p.addScaledVector(a, -p.dot(a)).normalize();
+  const q = new THREE.Vector3().crossVectors(a, p);
+  const R = 1.006; // just above the surface
+  const N = 64;
+  const out = [];
+  for (const [u, v] of [[p, q], [a, p], [a, q]]) {
+    for (let i = 0; i < N; i++) {
+      for (const t of [i, i + 1]) {
+        const ang = (t / N) * Math.PI * 2;
+        out.push(
+          (u.x * Math.cos(ang) + v.x * Math.sin(ang)) * R,
+          (u.y * Math.cos(ang) + v.y * Math.sin(ang)) * R,
+          (u.z * Math.cos(ang) + v.z * Math.sin(ang)) * R,
+        );
+      }
+    }
+  }
+  return new Float32Array(out);
+}
+
+/**
+ * The round, slider-driven core shared by every look that has one. The Shape slider picks the stop:
+ * dice solids (optionally numbered), geodesic spheres, or an outlined smooth ball.
+ */
+export function roundCore({ kit, color, settings, spinAxis }) {
+  const stop = stopFor(settings.shape);
+  const geometry = kit.geometry(`shape:${stop.value}`, () => buildShapeGeometry(stop.value));
+
+  if (stop.value >= HULL_FROM) {
+    const group = new THREE.Group();
+    group.add(kit.outlined(geometry, color), kit.lines(contourLines(spinAxis), color));
+    return group;
+  }
+  if (stop.value > DICE_MAX) return kit.wire(geometry, color); // 60 is the original body, bit for bit
+
+  const edges = kit.edges(geometry, color);
+  if (!settings.dice) return edges;
+  const group = new THREE.Group();
+  group.add(kit.occluder(geometry), edges, kit.lines(diceSegments(stop.value, geometry), color));
+  return group;
 }
 
 // ---- registry ---------------------------------------------------------------
@@ -135,10 +256,8 @@ export const LOOKS = {
     label: 'Body',
     tip: 'A round body, drawn the way every body has always looked',
     usesDetail: true,
-    build({ kit, color }) {
-      // low-poly icosahedron (detail 1) for an early-CG wireframe look
-      const core = kit.wire(kit.geometry('ico:1', () => new THREE.IcosahedronGeometry(1, 1)), color);
-      return { core };
+    build(ctx) {
+      return { core: roundCore(ctx) };
     },
   },
 };

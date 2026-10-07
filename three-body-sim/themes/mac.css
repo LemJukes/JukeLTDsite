@@ -392,6 +392,36 @@ html[data-theme^='mac'] .tgl input:checked + .tgl-box {
   box-shadow: none;
 }
 
+/* ---------- look controls ---------- */
+/* the Shape slider has fixed stops: its tick row replaces the free-running tick marks */
+html[data-theme^='mac'] .stops-slider input[type='range']::-webkit-slider-runnable-track {
+  background: linear-gradient(#000, #000) 0 calc(var(--px) * 15) / 100% calc(var(--px) * 2) no-repeat;
+}
+html[data-theme^='mac'] .stops-slider input[type='range']::-moz-range-track {
+  background: linear-gradient(#000, #000) 0 calc(var(--px) * 15) / 100% calc(var(--px) * 2) no-repeat;
+}
+html[data-theme^='mac'] .stops {
+  height: calc(var(--px) * 4);
+  margin-top: calc(var(--px) * -4);        /* up against the groove */
+  padding: 0 calc(var(--px) * 6.5);        /* half the slider pointer */
+  position: relative;
+}
+html[data-theme^='mac'] .stops span { width: var(--bw2); background: #000; }
+html[data-theme^='mac'] .shape-caption { margin-top: calc(var(--px) * 5); color: #000; text-transform: none; }
+/* not applicable: gray the text with a dither pattern instead of dimming it (1-bit) */
+html[data-theme^='mac'] .slider.disabled,
+html[data-theme^='mac'] .tgl.disabled { opacity: 1; }
+html[data-theme^='mac'] .slider.disabled .slider-label,
+html[data-theme^='mac'] .slider.disabled .shape-caption,
+html[data-theme^='mac'] .tgl.disabled > span:last-child {
+  color: transparent;
+  background: var(--pat-gray50) 0 0 / calc(var(--px) * 2) calc(var(--px) * 2);
+  -webkit-background-clip: text;
+          background-clip: text;
+}
+html[data-theme^='mac'] input[type='range']:disabled::-webkit-slider-thumb { visibility: hidden; }
+html[data-theme^='mac'] input[type='range']:disabled::-moz-range-thumb { visibility: hidden; }
+
 /* ---------- group boxes, readouts ---------- */
 html[data-theme^='mac'] .custom-body {
   padding: calc(var(--px) * 6) calc(var(--px) * 9);
