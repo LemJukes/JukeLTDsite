@@ -26,11 +26,17 @@
 //                never picked (picking uses an invisible unit sphere) and never limits the surface camera.
 //   update       optional; called every frame with the per-frame context (see makeLookContext)
 //   dispose      optional; extra clean-up beyond what the tracker already frees
+//   rideHidden   optional; objects inside `decorations` to hide while the camera stands on this body
+//   spinScale    optional; turns the look faster or slower than the body's own spin (default 1)
+//
+// Other registry fields: `noDice: true` for a core with no flat faces to number.
 //
 // To add a look: add an entry to LOOKS below. It appears in the Object menu automatically.
 
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SHAPE_DEFAULT, DICE_MAX, HULL_FROM, stopFor, buildShapeGeometry, diceSegments } from './shapes.js';
+import { fbm3 } from './noise.js';
 
 // ---- settings ---------------------------------------------------------------
 
@@ -114,11 +120,82 @@ export function makeTracker() {
  */
 export function makeKit(theme, tracker) {
   const material = (m) => tracker.own(m);
+  const page = new THREE.Color(theme.fadeTo); // what a fading line fades toward
+  const white = new THREE.Color(0xffffff);
   return {
     theme,
     additive: !!theme.additive,
     lit: false, // no shipped style does lighting, so looks skip shadows
     geometry: (key, factory) => tracker.geometry(key, factory),
+
+    /**
+     * A tint for things that are not the body itself (a comet's tails, a pulsar's field): `hex` in the
+     * light-emitting styles, the body's own ink in the ink styles, which have no colour. `fade` thins
+     * the ink toward the page so it dithers to a lighter stipple.
+     */
+    accent(hex, ink, fade = 0) {
+      return theme.additive ? new THREE.Color(hex) : new THREE.Color(ink).lerp(page, fade);
+    },
+
+    /** A whiter version of `color` where light adds up (a hot core); the ink as it is elsewhere. */
+    hot(color) {
+      return theme.additive ? new THREE.Color(color).lerp(white, 0.55) : new THREE.Color(color);
+    },
+
+    /** A see-through solid (a beam of light): light added in glowing styles, a thin ink wash in ink styles. */
+    beam(geometry, color, opacity) {
+      const mesh = new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+        blending: theme.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      })));
+      return mesh;
+    },
+
+    /**
+     * `lineCount` polylines of `points` points each, rewritten every frame (see the returned `set`) and
+     * fading from `color` at their start to the page at their tip, the way the orbit trails do: added
+     * light on dark styles, multiplied ink on light ones, mixed in display space so the dithered tip
+     * thins out evenly.
+     */
+    fadingLines(lineCount, points, color, ease = 1) {
+      const segs = lineCount * (points - 1);
+      const positions = new Float32Array(segs * 6);
+      const colors = new Float32Array(segs * 6);
+      const gamma = theme.additive ? 1 : 2.2;
+      const ig = 1 / gamma;
+      const head = [color.r, color.g, color.b].map((c) => Math.pow(c, ig));
+      const tip = [page.r, page.g, page.b].map((c) => Math.pow(c, ig));
+      const at = (k, out, o) => { // colour of point k of a line
+        const f = Math.pow(1 - k / (points - 1), ease);
+        for (let c = 0; c < 3; c++) out[o + c] = Math.pow(tip[c] + (head[c] - tip[c]) * f, gamma);
+      };
+      for (let l = 0; l < lineCount; l++) {
+        for (let k = 0; k < points - 1; k++) {
+          const o = (l * (points - 1) + k) * 6;
+          at(k, colors, o);
+          at(k + 1, colors, o + 3);
+        }
+      }
+      const geometry = tracker.own(new THREE.BufferGeometry());
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      const object = new THREE.LineSegments(geometry, material(new THREE.LineBasicMaterial({
+        vertexColors: true, transparent: true, depthWrite: false,
+        blending: theme.additive ? THREE.AdditiveBlending : THREE.MultiplyBlending,
+      })));
+      object.frustumCulled = false;
+      return {
+        object,
+        /** Write polyline `line` from `pts`, a flat [x, y, z, ...] list of `points` points. */
+        set(line, pts) {
+          for (let k = 0; k < points - 1; k++) {
+            const o = (line * (points - 1) + k) * 6;
+            for (let c = 0; c < 3; c++) { positions[o + c] = pts[k * 3 + c]; positions[o + 3 + c] = pts[(k + 1) * 3 + c]; }
+          }
+        },
+        commit() { geometry.attributes.position.needsUpdate = true; },
+      };
+    },
 
     /** Every triangle of `geometry` as a line: the original body look. */
     wire(geometry, color) {
@@ -230,10 +307,15 @@ function contourLines(spinAxis) {
 /**
  * The round, slider-driven core shared by every look that has one. The Shape slider picks the stop:
  * dice solids (optionally numbered), geodesic spheres, or an outlined smooth ball.
+ * `deform` (optional, { key, apply(geometry) }) lumps or dimples the chosen shape; such a core has no
+ * flat faces, so it is never numbered.
  */
-export function roundCore({ kit, color, settings, spinAxis }) {
+export function roundCore({ kit, color, settings, spinAxis }, deform = null) {
   const stop = stopFor(settings.shape);
-  const geometry = kit.geometry(`shape:${stop.value}`, () => buildShapeGeometry(stop.value));
+  const geometry = kit.geometry(
+    deform ? `shape:${stop.value}:${deform.key}` : `shape:${stop.value}`,
+    () => (deform ? deform.apply(buildShapeGeometry(stop.value)) : buildShapeGeometry(stop.value)),
+  );
 
   if (stop.value >= HULL_FROM) {
     const group = new THREE.Group();
@@ -243,10 +325,258 @@ export function roundCore({ kit, color, settings, spinAxis }) {
   if (stop.value > DICE_MAX) return kit.wire(geometry, color); // 60 is the original body, bit for bit
 
   const edges = kit.edges(geometry, color);
-  if (!settings.dice) return edges;
+  if (!settings.dice || deform) return edges;
   const group = new THREE.Group();
   group.add(kit.occluder(geometry), edges, kit.lines(diceSegments(stop.value, geometry), color));
   return group;
+}
+
+// ---- shared helpers for the looks below -------------------------------------
+
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+// any unit vector perpendicular to `axis`
+function anyPerpendicular(axis) {
+  const p = Math.abs(axis.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  return p.addScaledVector(axis, -p.dot(axis)).normalize();
+}
+
+// Merge a shape's vertices so its surface is one connected skin with smooth normals (the outline hull
+// and any displacement need that), then run `move(vertex)` over every vertex and re-normalise so the
+// farthest one sits at radius 1.
+function reshape(base, move) {
+  base.deleteAttribute('uv');
+  base.deleteAttribute('normal');
+  const g = mergeVertices(base, 1e-4);
+  base.dispose();
+  const p = g.attributes.position;
+  const v = new THREE.Vector3();
+  let max = 0;
+  for (let i = 0; i < p.count; i++) {
+    move(v.fromBufferAttribute(p, i));
+    p.setXYZ(i, v.x, v.y, v.z);
+    max = Math.max(max, v.length());
+  }
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) / max, p.getY(i) / max, p.getZ(i) / max);
+  g.computeVertexNormals();
+  return g;
+}
+
+// ---- neutron star -----------------------------------------------------------
+
+const PULSAR_TILT = (30 * Math.PI) / 180;   // magnetic axis off the spin axis
+const FIELD_SHELLS = [2.2, 3.4];            // dipole L values: where each loop crosses the equator (in radii)
+const BEAM_LENGTH = 7;                      // in radii
+const BEAM_HALF_ANGLE = (5 * Math.PI) / 180;
+
+// Dipole field lines r = L sin^2(theta), in a frame whose +z is the magnetic axis. Each shell gets four
+// loops round the axis, the outer shell turned 45 degrees against the inner. Segment pairs for LineSegments.
+function dipoleLines() {
+  const out = [];
+  const N = 40;
+  FIELD_SHELLS.forEach((L, s) => {
+    const theta0 = Math.asin(Math.sqrt(1 / L));          // where the loop meets the surface (r = 1)
+    for (let a = 0; a < 4; a++) {
+      const phi = (a * Math.PI) / 2 + (s * Math.PI) / 4;
+      const point = (k) => {
+        const th = theta0 + ((Math.PI - 2 * theta0) * k) / N;
+        const r = L * Math.sin(th) ** 2;
+        return [r * Math.sin(th) * Math.cos(phi), r * Math.sin(th) * Math.sin(phi), r * Math.cos(th)];
+      };
+      for (let k = 0; k < N; k++) out.push(...point(k), ...point(k + 1));
+    }
+  });
+  return new Float32Array(out);
+}
+
+// One beam: a hollow cone with its tip on the star's surface (+z), as triangles for a faint wash plus
+// edge lines (generators and two cross-sections) so it reads as a cone in every style.
+function beamGeometry() {
+  const tip = [0, 0, 1];
+  const far = 1 + BEAM_LENGTH;
+  const R = BEAM_LENGTH * Math.tan(BEAM_HALF_ANGLE);
+  const SIDES = 14;
+  const ring = (z, r, k) => [r * Math.cos((k / SIDES) * Math.PI * 2), r * Math.sin((k / SIDES) * Math.PI * 2), z];
+  const tris = [];
+  const lines = [];
+  for (let k = 0; k < SIDES; k++) {
+    tris.push(...tip, ...ring(far, R, k), ...ring(far, R, k + 1));
+    if (k % 2 === 0) lines.push(...tip, ...ring(far, R, k));
+    lines.push(...ring(far, R, k), ...ring(far, R, k + 1));
+    lines.push(...ring(1 + BEAM_LENGTH * 0.5, R * 0.5, k), ...ring(1 + BEAM_LENGTH * 0.5, R * 0.5, k + 1));
+  }
+  return { tris: new Float32Array(tris), lines: new Float32Array(lines) };
+}
+
+function neutronStar(ctx) {
+  const { kit, tracker, color, spinAxis, seed } = ctx;
+  const core = roundCore({ ...ctx, color: kit.hot(color) });
+
+  // the magnetic axis: the spin axis tilted 30 degrees, carried round by the spin so the field wobbles
+  const axis = spinAxis.clone().normalize();
+  const tilted = axis.clone().multiplyScalar(Math.cos(PULSAR_TILT))
+    .addScaledVector(anyPerpendicular(axis).applyAxisAngle(axis, seed * 2.1), Math.sin(PULSAR_TILT));
+  const align = new THREE.Quaternion().setFromUnitVectors(Z_AXIS, tilted);
+
+  const field = new THREE.Group();            // its +z is the magnetic axis
+  const fieldColor = kit.accent(0x7fd0ff, color);
+  field.add(kit.lines(dipoleLines(), fieldColor));
+  const beamColor = kit.accent(0xbfe6ff, color);
+  const cone = beamGeometry();
+  const wash = tracker.own(new THREE.BufferGeometry());
+  wash.setAttribute('position', new THREE.BufferAttribute(cone.tris, 3));
+  for (const sign of [1, -1]) {
+    const beam = new THREE.Group();
+    beam.scale.z = sign;
+    beam.add(kit.beam(wash, beamColor, kit.additive ? 0.18 : 0.12), kit.lines(cone.lines, beamColor));
+    field.add(beam);
+  }
+  field.quaternion.copy(align);
+
+  return {
+    core,
+    decorations: field,
+    update(dt, ctx2) { field.quaternion.copy(ctx2.spinQ).multiply(align); },
+    rideHidden: [field],     // the beams and loops start at the centre: not drawn around you on the surface
+    spinScale: 3,            // a pulsar turns fast
+  };
+}
+
+// ---- comet ------------------------------------------------------------------
+
+const ION_POINTS = 24;
+const DUST_LINES = 7;
+const DUST_POINTS = 18;
+const TAIL_MIN = 1.5;       // tail length in radii: never shorter than this...
+const TAIL_MAX = 12;        // ...nor longer
+const TAIL_REACH = 70;      // ...and 70 / (distance in radii) in between
+
+const NUCLEUS_STRETCH = new THREE.Vector3(1, 0.8, 0.9);
+
+// The lumpy nucleus: the chosen shape pushed in and out by seeded noise, then stretched a little.
+function lumpyNucleus(seed) {
+  return {
+    key: `comet:${seed}`,
+    apply: (base) => reshape(base, (v) => {
+      const n = fbm3(v.x * 1.7 + seed * 5.3, v.y * 1.7, v.z * 1.7, seed + 1);
+      v.multiplyScalar(0.78 + 0.5 * n).multiply(NUCLEUS_STRETCH);
+    }),
+  };
+}
+
+function comet(ctx) {
+  const { kit, color, seed } = ctx;
+  const core = roundCore(ctx, lumpyNucleus(seed));
+
+  const ionColor = kit.accent(0x7fc8ff, color);
+  const dustColor = kit.accent(0xffd27a, color, 0.45);
+  const ion = kit.fadingLines(1, ION_POINTS, ionColor, 1.3);
+  const dust = kit.fadingLines(DUST_LINES, DUST_POINTS, dustColor, 1.0);
+  const tails = new THREE.Group();
+  tails.add(dust.object, ion.object);
+
+  const away = new THREE.Vector3();
+  const vhat = new THREE.Vector3();
+  const vperp = new THREE.Vector3();
+  const side = new THREE.Vector3();
+  const ionPts = new Float32Array(ION_POINTS * 3);
+  const dustPts = new Float32Array(DUST_POINTS * 3);
+
+  return {
+    core,
+    decorations: tails,
+    update(dt, c) {
+      const me = c.body;
+
+      // Which body the tails answer to: the heaviest other body, or when this comet is the heaviest,
+      // whichever pulls on it hardest. (Ejected bodies do not count.)
+      let ref = null;
+      let heaviest = null;
+      for (const o of c.others) if (!o.ejected && (!heaviest || o.mass > heaviest.mass)) heaviest = o;
+      if (heaviest && heaviest.mass >= me.mass) ref = heaviest;
+      else {
+        let best = 0;
+        for (const o of c.others) {
+          if (o.ejected) continue;
+          const pull = o.mass / Math.max(o.pos.distanceToSquared(me.pos), 1e-6);
+          if (pull > best) { best = pull; ref = o; }
+        }
+      }
+
+      const speed = me.vel.length();
+      vhat.copy(me.vel);
+      if (speed > 1e-6) vhat.divideScalar(speed); else vhat.set(0, 0, 0);
+      let reach = TAIL_MIN;
+      if (ref) {
+        away.subVectors(me.pos, ref.pos);
+        const d = away.length();
+        away.divideScalar(Math.max(d, 1e-6));
+        reach = Math.min(TAIL_MAX, Math.max(TAIL_MIN, TAIL_REACH / (d / me.radius)));
+      } else if (speed > 1e-6) away.copy(vhat).negate();
+      else away.set(1, 0, 0);
+
+      // ion tail: a straight line straight away from the reference body
+      for (let k = 0; k < ION_POINTS; k++) {
+        const s = (reach * k) / (ION_POINTS - 1);
+        ionPts[k * 3] = away.x * s; ionPts[k * 3 + 1] = away.y * s; ionPts[k * 3 + 2] = away.z * s;
+      }
+      ion.set(0, ionPts);
+
+      // dust tail: starts out the same way but the grains are left behind as the comet moves, so it
+      // bends back against the velocity; a fan of curves that spreads with distance
+      vperp.copy(vhat).addScaledVector(away, -vhat.dot(away));
+      if (vperp.lengthSq() > 1e-8) vperp.normalize(); else vperp.set(0, 0, 0);
+      side.crossVectors(away, vhat);
+      if (side.lengthSq() < 1e-8) side.copy(anyPerpendicular(away)); else side.normalize();
+      const Ld = 0.85 * reach;
+      const bend = 0.12 + 0.55 * Math.min(1, speed / 0.8);
+      for (let i = 0; i < DUST_LINES; i++) {
+        const spread = (i - (DUST_LINES - 1) / 2) / ((DUST_LINES - 1) / 2);
+        for (let k = 0; k < DUST_POINTS; k++) {
+          const t = k / (DUST_POINTS - 1);
+          const along = Ld * t;           // out along the ion tail's direction
+          const lag = bend * Ld * t * t;  // bent back against the velocity, more the farther out
+          const fan = spread * 0.3 * Ld * t;
+          dustPts[k * 3] = away.x * along - vperp.x * lag + side.x * fan;
+          dustPts[k * 3 + 1] = away.y * along - vperp.y * lag + side.y * fan;
+          dustPts[k * 3 + 2] = away.z * along - vperp.z * lag + side.z * fan;
+        }
+        dust.set(i, dustPts);
+      }
+      ion.commit();
+      dust.commit();
+    },
+    rideHidden: [tails],
+  };
+}
+
+// ---- ringed planet ----------------------------------------------------------
+
+// Bands (inner, outer radius in body radii) with gaps between them.
+const RING_BANDS = [[1.45, 1.85], [2.0, 2.65], [2.8, 3.05]];
+const RING_STEP = 0.07;
+
+function ringedPlanet(ctx) {
+  const { kit, color, spinAxis } = ctx;
+  const core = roundCore(ctx);
+
+  // concentric circles across each band, lying in the plane perpendicular to the spin axis
+  const SEG = 96;
+  const out = [];
+  for (const [inner, outer] of RING_BANDS) {
+    const n = Math.max(1, Math.round((outer - inner) / RING_STEP));
+    for (let i = 0; i <= n; i++) {
+      const r = inner + ((outer - inner) * i) / n;
+      for (let k = 0; k < SEG; k++) {
+        const a0 = (k / SEG) * Math.PI * 2;
+        const a1 = ((k + 1) / SEG) * Math.PI * 2;
+        out.push(r * Math.cos(a0), r * Math.sin(a0), 0, r * Math.cos(a1), r * Math.sin(a1), 0);
+      }
+    }
+  }
+  const rings = kit.lines(new Float32Array(out), kit.accent(0xffd68a, color));
+  rings.quaternion.setFromUnitVectors(Z_AXIS, spinAxis.clone().normalize()); // ring normal = spin axis
+  return { core, decorations: rings };
 }
 
 // ---- black hole -------------------------------------------------------------
@@ -365,6 +695,31 @@ export const LOOKS = {
     usesDetail: false,
     build: blackHole,
   },
+
+  neutron: {
+    id: 'neutron',
+    label: 'Neutron star',
+    tip: 'A small hot star with a tilted magnetic field and two pulsar beams that sweep round as it spins',
+    usesDetail: true,
+    build: neutronStar,
+  },
+
+  comet: {
+    id: 'comet',
+    label: 'Comet',
+    tip: 'A lumpy nucleus trailing a straight ion tail and a curved dust tail, both pointing away from the heaviest body',
+    usesDetail: true,
+    noDice: true,            // lumpy, so no flat faces to number
+    build: comet,
+  },
+
+  ringed: {
+    id: 'ringed',
+    label: 'Ringed planet',
+    tip: 'A round planet with a ring system lying in its equatorial plane, tilted with its spin axis',
+    usesDetail: true,
+    build: ringedPlanet,
+  },
 };
 
 export const lookOrder = Object.keys(LOOKS);
@@ -406,6 +761,10 @@ export function createLook(settings, { theme, color, index, spinAxis }) {
     core: built.core,
     decorations: built.decorations || null,
     update: built.update || null,
+    // parts of the decorations that are not drawn while the camera stands on this body (things that
+    // start at its centre: tails, beams, field lines)
+    rideHidden: built.rideHidden || [],
+    spinScale: built.spinScale ?? 1,   // how fast this look turns, as a multiple of the body's own spin rate
     // how far the visible core reaches, in units of the physics radius (the surface camera
     // seats at SURFACE_EYE, so a core reaching past that is hidden while you stand on its body)
     coreReach: built.coreReach ?? measureReach(built.core),

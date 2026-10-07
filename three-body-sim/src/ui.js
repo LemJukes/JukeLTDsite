@@ -501,12 +501,12 @@ export function createUI(app) {
     shapeS.input.disabled = !hasShape;
     shapeS.row.classList.toggle('disabled', !hasShape);
     shapeS.row.setAttribute('data-tip', hasShape ? SHAPE_TIP : `The ${def.label} look has a fixed shape, so there is nothing to choose.`);
-    const diceOk = hasShape && stop.value <= DICE_MAX;
+    const diceOk = hasShape && !def.noDice && stop.value <= DICE_MAX;
     diceT.input.checked = !!look.dice;
     diceT.input.disabled = !diceOk;
     diceT.node.classList.toggle('disabled', !diceOk);
     diceT.node.setAttribute('data-tip', diceOk ? DICE_TIP
-      : hasShape ? 'Dice faces need a flat-faced shape: tetrahedron through icosahedron.'
+      : hasShape && !def.noDice ? 'Dice faces need a flat-faced shape: tetrahedron through icosahedron.'
         : `The ${def.label} look has no flat faces to number.`);
   }
 

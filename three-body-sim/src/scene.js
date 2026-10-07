@@ -594,9 +594,10 @@ export class SimScene {
       const hideCore = v === ridden && v.look && v.look.coreReach > SURFACE_EYE;
       v.coreNode.visible = visible && !hideCore;
       v.decoNode.visible = visible;
+      if (v.look) for (const part of v.look.rideHidden) part.visible = v !== ridden; // (tails, beams: they start at the centre)
       // cosmetic spin about the body's own axis; keeps going while the sim is paused (and a
       // surface camera turns with it, see _updateSurface)
-      v.spin += v.spinRate * dt;
+      v.spin += v.spinRate * (v.look ? v.look.spinScale : 1) * dt;
       v.spinQ.setFromAxisAngle(v.spinAxis, v.spin);
       if (visible) {
         v.coreNode.position.copy(v.body.pos);
