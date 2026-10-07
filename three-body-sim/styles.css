@@ -351,6 +351,8 @@ input[type='range']::-moz-range-thumb {
 
 /* look controls (selected body): the shape slider snaps to fixed stops, shown as a tick row under it */
 .look-box { margin-top: 10px; }
+.look-box > .tgl { margin: 9px 0; }
+.look-apply { margin-top: 12px; }
 .stops {
   display: flex;
   justify-content: space-between;

@@ -497,6 +497,9 @@ export function createUI(app) {
     diceT.node,
     moonT.node,
     moonS.row,
+    el('div', { class: 'btn-row look-apply' }, [
+      button('Apply to All', () => app.applyLookToAll(editIndex), '', "Give all three bodies this body's whole look: object, shape, dice faces and moonlets"),
+    ]),
   ]);
 
   // Show the selected body's look in the controls, greying out what does not apply to it.

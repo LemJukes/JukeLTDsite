@@ -456,6 +456,8 @@ html[data-theme^='mac'] .stops {
 }
 html[data-theme^='mac'] .stops span { width: var(--bw2); background: #000; }
 html[data-theme^='mac'] .shape-caption { margin-top: calc(var(--px) * 5); color: #000; text-transform: none; }
+html[data-theme^='mac'] .look-box > .tgl { margin: calc(var(--px) * 7) 0; }
+html[data-theme^='mac'] .look-apply { margin-top: calc(var(--px) * 10); }
 /* not applicable: gray the text with a dither pattern instead of dimming it (1-bit) */
 html[data-theme^='mac'] .slider.disabled,
 html[data-theme^='mac'] .tgl.disabled { opacity: 1; }
