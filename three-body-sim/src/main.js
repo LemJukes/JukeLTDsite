@@ -225,7 +225,9 @@ const app = {
   _onCollision(ev) {
     const col = new THREE.Color(ev.aColor).lerp(new THREE.Color(ev.bColor), 0.5);
     if (ev.severity >= 1) col.lerp(WHITE, Math.min(0.8, 0.2 + ev.severity / 20));
-    scene.spawnImpact(ev.point, { severity: ev.severity, color: col });
+    // (the note is only written by styles that annotate: the Lab Notebook)
+    const note = ev.outcome === 'merge' ? 'merge' : ev.category === 'catastrophic' ? 'SMASH!' : 'impact!';
+    scene.spawnImpact(ev.point, { severity: ev.severity, color: col, note });
     this._lastImpact = ev;
   },
 

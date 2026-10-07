@@ -20,6 +20,10 @@ import { ImpactFX } from './effects.js';
 import { pixelUnit } from './themes.js';
 import { createLook, defaultLook, makeLookContext, makeOtherSlot } from './bodyLooks.js';
 import { LensPass, MAX_HOLES } from './lens.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { pencilMaterial, bindPencil, pencilStrokes } from './pencil.js';
+import { NotebookNotes } from './notes.js';
 
 const GRID_CELL = 10;
 const PICK_MIN_PX = 22;      // a body can be picked from at least this far away on screen...
@@ -36,6 +40,58 @@ const STAR_TIERS = [         // faint field + a few bright stars; size in CSS px
   { count: 1400, size: 1 },
   { count: 160, size: 2 },
 ];
+
+// A pencil trail wavers by up to this much (world units) where a hand would.
+const TRAIL_WAVER = 0.05;
+// A fixed pseudo-random number in [-0.5, 0.5) from any real (the classic sine hash).
+const hand = (a) => { const s = Math.sin(a) * 43758.5453; return s - Math.floor(s) - 0.5; };
+
+// ---- graph paper ----
+const PAPER_CELL = 19;                 // CSS pixels per graph square, about 5 mm
+const PAPER_TILE = PAPER_CELL * 5;     // the repeat: a heavier line every fifth square
+
+// One tile of paper: the style's paper colour with a faint grain and a blue ruling. The canvas is drawn at a
+// whole number of device pixels per CSS pixel so the 1-pixel rules stay sharp.
+function makePaper(theme) {
+  const k = Math.max(1, Math.round(window.devicePixelRatio || 1));
+  const size = PAPER_TILE * k;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#' + new THREE.Color(theme.background).getHexString();
+  g.fillRect(0, 0, size, size);
+
+  // grain: every pixel a hair lighter or darker, plus a few short pale fibres
+  const rand = mulberry32(2024); // (defined just below, a function declaration)
+  const img = g.getImageData(0, 0, size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (rand() - 0.5) * 9;
+    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n * 0.9;
+  }
+  g.putImageData(img, 0, 0);
+  g.strokeStyle = 'rgba(120,110,90,0.10)';
+  g.lineWidth = 1;
+  for (let i = 0; i < 40 * k; i++) {
+    const x = rand() * size, y = rand() * size, a = rand() * Math.PI, l = (2 + rand() * 5) * k;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+
+  // ruling: faint blue every square, firmer on every fifth (the tile edge)
+  const step = PAPER_CELL * k;
+  for (let i = 0; i < 5; i++) {
+    g.fillStyle = i === 0 ? 'rgba(96,140,200,0.42)' : 'rgba(110,160,215,0.22)';
+    const w = i === 0 ? Math.max(1, k) : Math.max(1, Math.round(k * 0.6));
+    g.fillRect(i * step, 0, w, size);
+    g.fillRect(0, i * step, size, w);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.generateMipmaps = false;
+  texture.minFilter = texture.magFilter = THREE.NearestFilter; // 1-pixel rules must stay 1 pixel, not smear over two
+  return texture;
+}
 
 // Small deterministic PRNG so the sky is the same on every load.
 function mulberry32(seed) {
@@ -98,7 +154,8 @@ export class SimScene {
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(theme.background);
+    this._paper = null;                     // the notebook's sheet of graph paper (a texture), when in use
+    this._applyBackground(theme);
     this._fade = new THREE.Color(theme.fadeTo);
 
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, container.clientWidth / container.clientHeight, 0.1, 50000);
@@ -123,6 +180,9 @@ export class SimScene {
     this._buildGrid();
     this._buildCOM();
     this._buildSelection();
+    this.selectionVisible = false;          // whether the selected body's marker is to be drawn this frame
+    this.notes = new NotebookNotes(container); // red-pen annotations (only drawn by styles with `notes`)
+    this.notes.setTheme(theme);
 
     this.arrowGroup = new THREE.Group();
     this.scene.add(this.arrowGroup);
@@ -177,20 +237,63 @@ export class SimScene {
     return theme.pixelRatio ?? Math.min(window.devicePixelRatio, 2);
   }
 
+  // Free a scene object's geometries and materials (anything under it too).
+  _disposeObject(object) {
+    object.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+  }
+
+  // The scene background: a flat colour, or in a `paper` style a sheet of graph paper. The paper is a
+  // procedural tile (ruling every ~5 mm, a heavier line every fifth, a faint grain) repeated across the
+  // view. A background is drawn in screen space, so the ruling stays put when the camera moves.
+  _applyBackground(theme) {
+    if (this._paper) { this._paper.dispose(); this._paper = null; }
+    if (theme.paper) {
+      this._paper = makePaper(theme);
+      this.scene.background = this._paper;
+      this._fitPaper();
+    } else {
+      this.scene.background = new THREE.Color(theme.background);
+    }
+  }
+
+  _fitPaper() {
+    if (!this._paper) return;
+    this._paper.repeat.set(this.container.clientWidth / PAPER_TILE, this.container.clientHeight / PAPER_TILE);
+  }
+
   _buildGrid() {
     if (this.grid) {
       this.scene.remove(this.grid);
-      this.grid.geometry.dispose();
-      this.grid.material.dispose();
+      this._disposeObject(this.grid);
     }
     const [c1, c2] = this.theme.grid;
-    this.grid = new THREE.GridHelper(2000, 2000 / GRID_CELL, c1, c2);
-    // GridHelper lies in the xz plane by default; rotate it into the xy plane so
-    // it sits behind the (planar) orbits, matching the original "backdrop" idea.
-    this.grid.rotation.x = Math.PI / 2;
-    this.grid.material.transparent = this.theme.gridOpacity < 1;
-    this.grid.material.opacity = this.theme.gridOpacity;
-    this.grid.material.depthWrite = false;
+    if (this.theme.stroke === 'pencil') {
+      // a pencil grid: straight ruled lines across the xy plane, the centre lines pressed a bit harder
+      const E = 1000;
+      const minor = [];
+      const centre = [];
+      for (let i = -E / GRID_CELL; i <= E / GRID_CELL; i++) {
+        const p = i * GRID_CELL;
+        (i === 0 ? centre : minor).push(p, -E, 0, p, E, 0, -E, p, 0, E, p, 0);
+      }
+      this.grid = new THREE.Group();
+      for (const [segs, color, width] of [[minor, c2, 1.0], [centre, c1, 1.7]]) {
+        const { object, own } = pencilStrokes(new Float32Array(segs), color, { seed: 5, amp: 0, widths: [width] });
+        for (const m of own) if (m.isMaterial) m.depthWrite = false;
+        this.grid.add(object);
+      }
+    } else {
+      this.grid = new THREE.GridHelper(2000, 2000 / GRID_CELL, c1, c2);
+      // GridHelper lies in the xz plane by default; rotate it into the xy plane so
+      // it sits behind the (planar) orbits, matching the original "backdrop" idea.
+      this.grid.rotation.x = Math.PI / 2;
+      this.grid.material.transparent = this.theme.gridOpacity < 1;
+      this.grid.material.opacity = this.theme.gridOpacity;
+      this.grid.material.depthWrite = false;
+    }
     this.scene.add(this.grid);
   }
 
@@ -314,7 +417,7 @@ export class SimScene {
   /** Restyle the whole scene for a UI style (the `scene` half of a themes.js entry). */
   setTheme(theme) {
     this.theme = theme;
-    this.scene.background.set(theme.background);
+    this._applyBackground(theme);
     this._fade.set(theme.fadeTo);
 
     this.resize(); // also re-derives the renderer resolution for this style
@@ -331,10 +434,44 @@ export class SimScene {
     this.selectionBox.material.opacity = theme.selectOpacity;
 
     this.fx.setTheme(theme);
+    this.notes.setTheme(theme);
     for (const v of this.bodyVisuals) {
+      if (!!v.trail.isLine2 !== (theme.stroke === 'pencil')) this._swapTrail(v); // pencil trails are Line2, others plain lines
       this._styleVisual(v);
       this._restyleLook(v); // the look's materials depend on the style, so build it afresh
     }
+  }
+
+  // A trail: a fixed-capacity buffer drawn as a line whose vertex colour fades from the body's ink at the
+  // head to the background colour at the tail (additive on dark styles, multiply on light ones, see
+  // _styleVisual). In a pencil style it is a Line2, whose width is real, instead of a 1-pixel line.
+  _makeTrail() {
+    if (this.theme.stroke === 'pencil') {
+      const geo = new LineGeometry();
+      geo.setPositions(new Float32Array(TRAIL_CAPACITY * 3));
+      geo.setColors(new Float32Array(TRAIL_CAPACITY * 3));
+      geo.instanceCount = 0;
+      const mat = pencilMaterial({ color: 0xffffff, width: 1.7, vertexColors: true, transparent: true, depthWrite: false });
+      const line = new Line2(geo, mat);
+      bindPencil(line, mat);
+      line.frustumCulled = false;
+      return line;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_CAPACITY * 3), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(TRAIL_CAPACITY * 3), 3));
+    geo.setDrawRange(0, 0);
+    const trail = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }));
+    trail.frustumCulled = false;
+    return trail;
+  }
+
+  _swapTrail(v) {
+    this.scene.remove(v.trail);
+    v.trail.geometry.dispose();
+    v.trail.material.dispose();
+    v.trail = this._makeTrail();
+    this.scene.add(v.trail);
   }
 
   _inkFor(body) {
@@ -348,21 +485,25 @@ export class SimScene {
     const hex = v.color.getHex();
     v.trail.material.blending = this.theme.additive ? THREE.AdditiveBlending : THREE.MultiplyBlending;
     v.trail.material.needsUpdate = true;
-    v.zline.material.color.copy(v.color);
+    // a style with red-pen annotations draws the drop lines and velocity arrows in the pen colour
+    const annot = this.theme.annot != null ? new THREE.Color(this.theme.annot) : null;
+    v.zline.material.color.copy(annot || v.color);
     v.zline.material.opacity = this.theme.zOpacity;
-    v.arrow.setColor(hex);
+    v.arrow.setColor(annot ? annot.getHex() : hex);
   }
 
   // ---- collision effects ----
 
-  /** Fire a cosmetic impact burst at `point`. opts: { severity, color }. */
+  /** Fire a cosmetic impact burst at `point`. opts: { severity, color, note } (the note is for styles that write one). */
   spawnImpact(point, opts) {
     this.fx.spawn(point, opts);
+    if (opts && opts.note) this.notes.addImpact(point, opts.note);
   }
 
   /** Snuff out any in-flight bursts (reset / config change). */
   clearEffects() {
     this.fx.clear();
+    this.notes.clear();
   }
 
   /**
@@ -389,24 +530,7 @@ export class SimScene {
       const proxy = new THREE.Mesh(this._proxyGeo, this._proxyMat);
       proxy.userData.index = i;
 
-      // trail: fixed-capacity buffer, drawn as a line whose vertex colour fades
-      // from the body's ink at the head to the background colour at the tail
-      // (additive on dark styles, multiply on light ones — see _styleVisual).
-      const positions = new Float32Array(TRAIL_CAPACITY * 3);
-      const colors = new Float32Array(TRAIL_CAPACITY * 3);
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geo.setDrawRange(0, 0);
-      const trail = new THREE.Line(
-        geo,
-        new THREE.LineBasicMaterial({
-          vertexColors: true,
-          transparent: true,
-          depthWrite: false,
-        })
-      );
-      trail.frustumCulled = false;
+      const trail = this._makeTrail();
 
       const arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 1, color.getHex());
       this.arrowGroup.add(arrow);
@@ -572,7 +696,8 @@ export class SimScene {
   clearTrails() {
     for (const v of this.bodyVisuals) {
       v.points.length = 0;
-      v.trail.geometry.setDrawRange(0, 0);
+      if (v.trail.isLine2) v.trail.geometry.instanceCount = 0;
+      else v.trail.geometry.setDrawRange(0, 0);
     }
   }
 
@@ -628,7 +753,9 @@ export class SimScene {
     // selection cage follows the selected body (not drawn around you while you stand on it)
     const sel = this.bodyVisuals[this.selectedIndex];
     const standingOn = this.cam.view === 'surface' && this.cam.focus === this.selectedIndex;
-    this.selectionBox.visible = !!sel && !sel.body.ejected && !standingOn;
+    this.selectionVisible = !!sel && !sel.body.ejected && !standingOn;
+    // (a style with red-pen notes circles the selected body there instead of caging it)
+    this.selectionBox.visible = this.selectionVisible && !this.theme.notes;
     if (this.selectionBox.visible) {
       this.selectionBox.position.copy(sel.body.pos);
       this.selectionBox.scale.setScalar(sel.body.radius * 2.6);
@@ -639,7 +766,7 @@ export class SimScene {
     // centre of mass
     system.centerOfMass(this._com);
     this.comGroup.position.copy(this._com);
-    this.comGroup.visible = this.options.showCOM;
+    this.comGroup.visible = this.options.showCOM && !this.theme.notes; // (the notes draw it as a red "c.o.m." instead)
 
     // velocity arrows
     this.arrowGroup.visible = this.options.showVectors;
@@ -663,8 +790,13 @@ export class SimScene {
   _updateTrailGeometry(v) {
     const pts = v.points;
     const n = this.options.showTrails ? pts.length : 0;
-    const pos = v.trail.geometry.attributes.position.array;
-    const col = v.trail.geometry.attributes.color.array;
+    const pencil = !!v.trail.isLine2;
+    // plain lines: parallel position / colour buffers. Pencil (Line2): one interleaved buffer of
+    // segments [start xyz, end xyz], and the same for colours, rewritten in place.
+    const pos = pencil ? null : v.trail.geometry.attributes.position.array;
+    const col = pencil ? null : v.trail.geometry.attributes.color.array;
+    const segPos = pencil ? v.trail.geometry.attributes.instanceStart.data.array : null;
+    const segCol = pencil ? v.trail.geometry.attributes.instanceColorStart.data.array : null;
     const r = v.color.r, g = v.color.g, b = v.color.b;
     const fr = this._fade.r, fg = this._fade.g, fb = this._fade.b;
     // Ink styles fade by *displayed* brightness (mix in gamma space, then back to
@@ -676,13 +808,33 @@ export class SimScene {
     const dfr = Math.pow(fr, ig), dfg = Math.pow(fg, ig), dfb = Math.pow(fb, ig);
     for (let k = 0; k < n; k++) {
       const p = pts[k];
-      const o = k * 3;
-      pos[o] = p.x; pos[o + 1] = p.y; pos[o + 2] = p.z;
       const t = n > 1 ? k / (n - 1) : 1; // 0 at tail -> 1 at head
       const f = Math.pow(t, ease); // ease so the fade hugs the head
-      col[o] = Math.pow(dfr + (dr - dfr) * f, gamma);
-      col[o + 1] = Math.pow(dfg + (dg - dfg) * f, gamma);
-      col[o + 2] = Math.pow(dfb + (db - dfb) * f, gamma);
+      const cr = Math.pow(dfr + (dr - dfr) * f, gamma);
+      const cg = Math.pow(dfg + (dg - dfg) * f, gamma);
+      const cb = Math.pow(dfb + (db - dfb) * f, gamma);
+      if (pencil) {
+        // each point is the end of the segment before it and the start of the one after, nudged by a
+        // fixed amount that depends only on where the point is (so it neither crawls nor re-rolls as
+        // the buffer scrolls), the way a hand wavers
+        const x = p.x + hand(p.x * 12.9898 + p.y * 78.233 + p.z * 37.719) * TRAIL_WAVER;
+        const y = p.y + hand(p.x * 93.989 + p.y * 67.345 + p.z * 12.543) * TRAIL_WAVER;
+        const z = p.z + hand(p.x * 45.164 + p.y * 24.581 + p.z * 91.213) * TRAIL_WAVER;
+        if (k <= n - 2) { const o = k * 6; segPos[o] = x; segPos[o + 1] = y; segPos[o + 2] = z; segCol[o] = cr; segCol[o + 1] = cg; segCol[o + 2] = cb; }
+        if (k >= 1) { const o = (k - 1) * 6 + 3; segPos[o] = x; segPos[o + 1] = y; segPos[o + 2] = z; segCol[o] = cr; segCol[o + 1] = cg; segCol[o + 2] = cb; }
+      } else {
+        const o = k * 3;
+        pos[o] = p.x; pos[o + 1] = p.y; pos[o + 2] = p.z;
+        col[o] = cr;
+        col[o + 1] = cg;
+        col[o + 2] = cb;
+      }
+    }
+    if (pencil) {
+      v.trail.geometry.attributes.instanceStart.data.needsUpdate = true;
+      v.trail.geometry.attributes.instanceColorStart.data.needsUpdate = true;
+      v.trail.geometry.instanceCount = Math.max(0, n - 1);
+      return;
     }
     v.trail.geometry.setDrawRange(0, n);
     v.trail.geometry.attributes.position.needsUpdate = true;
@@ -771,6 +923,7 @@ export class SimScene {
         d.dispose();
       }
     }
+    this._fitPaper(); // the paper repeats once per tile of CSS pixels
     this._styleStars(); // star sizes are in whole render pixels, which depend on the pixel ratio
   }
 
@@ -985,8 +1138,9 @@ export class SimScene {
     this.stars.visible = this.options.showStars;
     this.stars.position.copy(this.camera.position); // keep the sky at infinity
     this._updateGrid();
-    this.fx.update();
+    this.fx.update(this.camera);
     this._updateLens();
+    this.notes.update(this);
     this.composer.render();
   }
 }

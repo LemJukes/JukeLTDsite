@@ -1,0 +1,355 @@
+/* themes/notebook.css — the "Lab Notebook" UI style: a physics lab notebook.
+ *
+ * Graph paper under the scene, graphite pencil for the drawing, red ballpoint for the notes. The control
+ * panel is an index card taped into the margin; buttons are hand-drawn boxes; sliders are ruled lines
+ * with a pencil mark for a thumb. Everything is scoped to html[data-theme='notebook'] (set from
+ * src/themes.js), whose scene half draws the paper, the pencil strokes and the red-pen notes in the
+ * 3D view itself.
+ *
+ * Fonts (Google Fonts, SIL OFL, linked in index.html): Kalam for the interface and Reenie Beanie, a pen
+ * script, for the red notes. Text is in normal case; the CRT style upper-cases with CSS and that must not
+ * leak in, so the first rule below resets it.
+ */
+
+html[data-theme='notebook'] {
+  --paper: #f4f0e2;
+  --card: #fbf8ee;
+  --ink: #34363b;               /* graphite */
+  --ink-soft: #6a6c72;
+  --red: #c4262e;               /* red ballpoint */
+  --rule: rgba(105, 150, 205, 0.30);
+  --tape: rgba(228, 212, 158, 0.78);
+  --hand: 'Kalam', 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+  --pen: 'Reenie Beanie', 'Segoe Script', 'Bradley Hand', cursive;
+
+  /* the variables the default style uses, remapped to pencil and ballpoint */
+  --green: var(--ink);
+  --green-dim: var(--ink-soft);
+  --amber: var(--red);
+  --cyan: var(--ink);
+  --blue: var(--red);
+  --bg: var(--paper);
+  --panel-bg: var(--card);
+  --line: var(--ink);
+  --line-soft: rgba(52, 54, 59, 0.28);
+  --glow: none;
+  --mono: var(--hand);
+  --display: var(--pen);
+  --sev-merge: var(--ink);
+  --sev-disruption: #9a6200;
+  --sev-catastrophic: var(--red);
+}
+
+/* ---------- page ---------- */
+html[data-theme='notebook'],
+html[data-theme='notebook'] body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--hand);
+  font-size: 14px;
+  -webkit-font-smoothing: auto;
+}
+html[data-theme='notebook'] * { text-transform: none; letter-spacing: 0; text-shadow: none; }
+html[data-theme='notebook'] body::after { display: none; }                 /* no CRT scanlines */
+html[data-theme='notebook'] .caps { text-transform: capitalize; }
+
+/* the red double rule down the left margin of the page */
+html[data-theme='notebook'] #scene::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 76px;
+  width: 4px;
+  z-index: 2;
+  pointer-events: none;
+  border-left: 1.5px solid rgba(196, 38, 46, 0.7);
+  border-right: 1.5px solid rgba(196, 38, 46, 0.7);
+}
+
+/* ---------- header ---------- */
+html[data-theme='notebook'] #topbar {
+  padding: 4px 18px 4px 92px;
+  background: linear-gradient(to bottom, rgba(244, 240, 226, 0.94), rgba(244, 240, 226, 0));
+  border-bottom: 0;
+  color: var(--ink);
+}
+html[data-theme='notebook'] .brand { font-family: var(--pen); font-size: 36px; line-height: 1; gap: 8px; text-shadow: none; }
+html[data-theme='notebook'] .brand-mark { color: var(--red); text-shadow: none; }
+html[data-theme='notebook'] .brand-ver { display: none; }
+html[data-theme='notebook'] .topstats { gap: 14px; align-items: center; font-size: 15px; }
+html[data-theme='notebook'] .stat { color: var(--ink); text-shadow: none; }
+html[data-theme='notebook'] .status {
+  padding: 0 10px;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 14px 3px 12px 3px / 3px 12px 3px 14px;
+  text-shadow: none;
+}
+html[data-theme='notebook'] .status.on { color: var(--card); background: var(--ink); animation: none; text-shadow: none; }
+html[data-theme='notebook'] .help-btn {
+  width: 26px;
+  height: 26px;
+  font-family: var(--pen);
+  font-size: 22px;
+  color: var(--red);
+  background: transparent;
+  border: 1.8px solid var(--red);
+  border-radius: 55% 45% 50% 50% / 50% 55% 45% 50%;
+}
+html[data-theme='notebook'] .help-btn:hover { background: rgba(196, 38, 46, 0.08); box-shadow: none; }
+
+/* ---------- the control panel: an index card taped into the margin ---------- */
+html[data-theme='notebook'] #panel {
+  top: 58px;
+  right: 16px;
+  bottom: 14px;
+  width: 316px;
+  background:
+    linear-gradient(var(--red), var(--red)) 0 44px / 100% 1.5px no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px) 0 46px / 100% 100% no-repeat,
+    var(--card);
+  border: 0;
+  border-radius: 3px;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.07), 3px 7px 16px rgba(70, 55, 30, 0.30);
+  backdrop-filter: none;
+  transition: none;
+}
+html[data-theme='notebook'] #panel::before,
+html[data-theme='notebook'] #panel::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  width: 78px;
+  height: 24px;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--tape);
+  box-shadow: 0 1px 2px rgba(60, 50, 20, 0.18);
+  clip-path: polygon(0 0, 100% 0, 97% 25%, 100% 50%, 97% 75%, 100% 100%, 0 100%, 3% 75%, 0 50%, 3% 25%);
+}
+html[data-theme='notebook'] #panel::before { left: -24px; transform: rotate(-38deg); }
+html[data-theme='notebook'] #panel::after { right: -24px; transform: rotate(38deg); }
+html[data-theme='notebook'] body.panel-hidden #panel { transform: translateX(110%); }
+html[data-theme='notebook'] #panel-body { padding: 24px 16px 26px 18px; }
+html[data-theme='notebook'] #panel-body::-webkit-scrollbar { width: 9px; }
+html[data-theme='notebook'] #panel-body::-webkit-scrollbar-thumb { background: rgba(52, 54, 59, 0.45); border-radius: 5px; }
+html[data-theme='notebook'] #panel-toggle {
+  top: 62px;
+  right: 344px;
+  padding: 2px 10px;
+  font-family: var(--pen);
+  font-size: 20px;
+  color: var(--red);
+  background: #fff3a6;
+  border: 0;
+  box-shadow: 1px 2px 4px rgba(60, 50, 20, 0.3);
+  transform: rotate(-3deg);
+  transition: none;
+}
+html[data-theme='notebook'] body.panel-hidden #panel-toggle { right: 18px; }
+
+/* ---------- section headings ---------- */
+html[data-theme='notebook'] .section { margin-bottom: 20px; }
+html[data-theme='notebook'] .section-title {
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 0;
+  font-family: var(--pen);
+  font-size: 25px;
+  line-height: 1.05;
+  color: var(--red);
+  border-bottom: 2px solid var(--red);
+  border-radius: 0 0 40% 5% / 0 0 6px 2px;
+}
+html[data-theme='notebook'] .section-title:hover { color: var(--red); }
+html[data-theme='notebook'] .section-arrow { color: var(--red); font-size: 13px; transition: none; }
+
+/* ---------- buttons: hand-drawn boxes ---------- */
+html[data-theme='notebook'] .btn {
+  padding: 4px 9px 5px;
+  font-family: var(--hand);
+  font-size: 14px;
+  line-height: 1.15;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--ink);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  box-shadow: none;
+  transition: none;
+}
+html[data-theme='notebook'] .btn:hover { background: rgba(52, 54, 59, 0.07); box-shadow: none; }
+html[data-theme='notebook'] .btn:active,
+html[data-theme='notebook'] .btn.active { color: var(--card); background: var(--ink); transform: none; box-shadow: none; text-shadow: none; }
+html[data-theme='notebook'] .btn-primary { color: var(--red); border-color: var(--red); }
+html[data-theme='notebook'] .btn-primary:hover { background: rgba(196, 38, 46, 0.09); box-shadow: none; }
+html[data-theme='notebook'] .btn-grid,
+html[data-theme='notebook'] .btn-row { gap: 7px; }
+
+/* ---------- sliders: ruled lines with ticks and a pencil mark ---------- */
+html[data-theme='notebook'] .slider { margin: 8px 0; }
+html[data-theme='notebook'] .slider-label { font-size: 14px; }
+html[data-theme='notebook'] .slider-val { color: var(--red); font-family: var(--pen); font-size: 20px; line-height: 1; }
+html[data-theme='notebook'] input[type='range'] { height: 22px; background: transparent; cursor: pointer; }
+html[data-theme='notebook'] input[type='range']::-webkit-slider-runnable-track {
+  height: 22px;
+  background:
+    linear-gradient(var(--ink), var(--ink)) 0 12px / 100% 1.5px no-repeat,
+    repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 12px) 0 14px / 100% 5px no-repeat;
+}
+html[data-theme='notebook'] input[type='range']::-moz-range-track {
+  height: 22px;
+  background:
+    linear-gradient(var(--ink), var(--ink)) 0 12px / 100% 1.5px no-repeat,
+    repeating-linear-gradient(90deg, var(--ink) 0 1px, transparent 1px 12px) 0 14px / 100% 5px no-repeat;
+}
+html[data-theme='notebook'] input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 22px;
+  margin-top: 0;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='22'><path d='M3 21 L9 3' stroke='%2334363b' stroke-width='3.2' stroke-linecap='round'/><path d='M3.4 6.5 L8.2 4.2' stroke='%23c4262e' stroke-width='1.4' stroke-linecap='round'/></svg>") center / 100% 100% no-repeat;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+html[data-theme='notebook'] input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 22px;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='22'><path d='M3 21 L9 3' stroke='%2334363b' stroke-width='3.2' stroke-linecap='round'/><path d='M3.4 6.5 L8.2 4.2' stroke='%23c4262e' stroke-width='1.4' stroke-linecap='round'/></svg>") center / 100% 100% no-repeat;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+/* the Shape slider has fixed stops: its own tick row replaces the free-running ticks */
+html[data-theme='notebook'] .stops-slider input[type='range']::-webkit-slider-runnable-track { background: linear-gradient(var(--ink), var(--ink)) 0 12px / 100% 1.5px no-repeat; }
+html[data-theme='notebook'] .stops-slider input[type='range']::-moz-range-track { background: linear-gradient(var(--ink), var(--ink)) 0 12px / 100% 1.5px no-repeat; }
+html[data-theme='notebook'] .stops { height: 6px; margin-top: -5px; }
+html[data-theme='notebook'] .stops span { width: 1.5px; background: var(--ink); }
+html[data-theme='notebook'] .shape-caption { margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
+html[data-theme='notebook'] .slider.disabled,
+html[data-theme='notebook'] .tgl.disabled { opacity: 0.45; }
+
+/* ---------- check boxes ---------- */
+html[data-theme='notebook'] .tgl { gap: 8px; font-size: 14px; }
+html[data-theme='notebook'] .tgl-box {
+  width: 17px;
+  height: 17px;
+  background: transparent;
+  border: 2px solid var(--ink);
+  border-radius: 3px 6px 3px 7px;
+  box-shadow: none;
+}
+html[data-theme='notebook'] .tgl input:checked + .tgl-box {
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='17' height='17'><path d='M2.5 9 L7 14 L15.5 1.5' stroke='%23c4262e' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") center / 15px 15px no-repeat;
+  box-shadow: none;
+}
+
+/* ---------- boxes, readouts ---------- */
+html[data-theme='notebook'] .custom-body {
+  padding: 8px 11px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1.6px solid var(--ink);
+  border-radius: 7px 3px 8px 3px / 3px 8px 3px 7px;
+}
+html[data-theme='notebook'] .custom-body-title { font-family: var(--pen); font-size: 23px; line-height: 1; color: var(--red); gap: 8px; }
+html[data-theme='notebook'] .editor-hint,
+html[data-theme='notebook'] .io-name-label,
+html[data-theme='notebook'] .cam-hint { font-size: 13px; line-height: 1.35; color: var(--ink-soft); }
+html[data-theme='notebook'] .swatch {
+  width: 14px;
+  height: 14px;
+  background: var(--ink) !important;
+  border-radius: 50%;
+  box-shadow: none;
+}
+html[data-theme='notebook'] .ro-grid { font-size: 14px; }
+html[data-theme='notebook'] .ro-label { color: var(--ink-soft); }
+html[data-theme='notebook'] .ro-val { color: var(--ink); }
+html[data-theme='notebook'] .ro-val.warn,
+html[data-theme='notebook'] .ro-val[data-sev='catastrophic'] { color: var(--red); text-shadow: none; }
+html[data-theme='notebook'] .ro-val[data-sev='disruption'] { color: var(--sev-disruption); }
+html[data-theme='notebook'] .ro-sub { font-family: var(--pen); font-size: 20px; line-height: 1; color: var(--red); }
+html[data-theme='notebook'] .bar-track { background: transparent; border: 1.5px solid var(--ink); border-radius: 2px 5px 2px 5px; }
+html[data-theme='notebook'] .bar-fill { box-shadow: none; transition: none; }
+/* bodies A / B / C in graphite: told apart by hatching instead of colour */
+html[data-theme='notebook'] .bar-fill[data-body='0'] { background: var(--ink) !important; }
+html[data-theme='notebook'] .bar-fill[data-body='1'] { background: repeating-linear-gradient(45deg, var(--ink) 0 2px, transparent 2px 5px) !important; }
+html[data-theme='notebook'] .bar-fill[data-body='2'] { background: radial-gradient(var(--ink) 1px, transparent 1.5px) 0 0 / 5px 5px !important; }
+html[data-theme='notebook'] .bar-label { color: var(--red); font-family: var(--pen); font-size: 18px; }
+html[data-theme='notebook'] .bar-val { color: var(--ink); }
+
+/* ---------- text field, status ---------- */
+html[data-theme='notebook'] .io-name {
+  font-family: var(--hand);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0;
+}
+html[data-theme='notebook'] .io-name:focus { border-color: var(--red); box-shadow: none; }
+html[data-theme='notebook'] .io-name::selection { background: rgba(196, 38, 46, 0.25); color: var(--ink); }
+html[data-theme='notebook'] .io-status { color: var(--ink); text-shadow: none; }
+html[data-theme='notebook'] .io-status.error { color: var(--red); text-shadow: none; }
+
+/* ---------- popup menu ---------- */
+html[data-theme='notebook'] .menu-label { font-size: 14px; }
+html[data-theme='notebook'] .menu-btn {
+  padding: 4px 9px 5px;
+  font-family: var(--hand);
+  font-size: 14px;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--ink);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  box-shadow: none;
+}
+html[data-theme='notebook'] .menu-btn:hover { background: rgba(52, 54, 59, 0.07); box-shadow: none; }
+html[data-theme='notebook'] .menu-btn[aria-expanded='true'] { color: var(--card); background: var(--ink); box-shadow: none; }
+html[data-theme='notebook'] .menu-list {
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 6px 3px 7px 3px / 3px 7px 3px 6px;
+  box-shadow: 3px 5px 0 rgba(60, 50, 30, 0.18);
+}
+html[data-theme='notebook'] .menu-item { font-family: var(--hand); font-size: 14px; color: var(--ink); }
+html[data-theme='notebook'] .menu-item.active { color: var(--card); background: var(--ink); }
+html[data-theme='notebook'] .menu-item[aria-selected='true']::before { content: '\2713'; color: var(--red); }
+html[data-theme='notebook'] .menu-item.active[aria-selected='true']::before { color: var(--card); }
+
+/* ---------- help popover, tooltips: a note and a sticky note ---------- */
+html[data-theme='notebook'] .popover {
+  background: var(--card);
+  border: 0;
+  border-radius: 3px;
+  box-shadow: 2px 4px 14px rgba(60, 50, 30, 0.35);
+  backdrop-filter: none;
+}
+html[data-theme='notebook'] .popover-title { font-family: var(--pen); font-size: 26px; line-height: 1; color: var(--red); border-bottom: 2px solid var(--red); }
+html[data-theme='notebook'] .popover-title::before { content: ''; }
+html[data-theme='notebook'] .popover-grid { font-size: 14px; }
+html[data-theme='notebook'] .popover-grid > span:nth-child(odd) { color: var(--red); }
+html[data-theme='notebook'] .popover-grid > span.k {
+  color: var(--ink);
+  background: transparent;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px 7px 4px 7px;
+  box-shadow: none;
+}
+html[data-theme='notebook'] .tip {
+  max-width: 250px;
+  padding: 8px 12px 9px;
+  font-family: var(--pen);
+  font-size: 19px;
+  line-height: 1.1;
+  color: var(--ink);
+  background: #fff3a6;
+  border: 0;
+  border-radius: 1px;
+  box-shadow: 2px 4px 8px rgba(60, 50, 20, 0.32);
+  transform: rotate(-1.2deg);
+}
+
+/* ---------- the red-pen notes drawn over the scene (src/notes.js) ---------- */
+html[data-theme='notebook'] .notes text { font-family: var(--pen); }

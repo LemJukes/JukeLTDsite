@@ -38,6 +38,16 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TeapotGeometry } from 'three/addons/geometries/TeapotGeometry.js';
 import { SHAPE_DEFAULT, DICE_MAX, HULL_FROM, stopFor, buildShapeGeometry, diceSegments } from './shapes.js';
 import { fbm3, valueNoise3, mulberry32 } from './noise.js';
+import { pencilStrokes } from './pencil.js';
+
+// The attributes holding a geometry's vertices: `position` normally, but for the instanced pencil (Line2)
+// geometry the segment ends (its `position` is only the template quad every segment is drawn with).
+function vertexAttributes(geometry) {
+  const a = geometry.attributes;
+  if (!a) return [];
+  if (a.instanceStart) return [a.instanceStart, a.instanceEnd];
+  return a.position ? [a.position] : [];
+}
 
 // ---- settings ---------------------------------------------------------------
 
@@ -119,13 +129,26 @@ export function makeTracker() {
  * for "a wireframe in this ink" and gets whatever that style draws: today a plain wireframe mesh, in
  * the Lab Notebook style a pencil stroke. Everything it creates is registered with the tracker.
  */
-export function makeKit(theme, tracker) {
+export function makeKit(theme, tracker, seed = 0) {
   const material = (m) => tracker.own(m);
   const page = new THREE.Color(theme.fadeTo); // what a fading line fades toward
   const white = new THREE.Color(0xffffff);
+
+  // In the Lab Notebook style every stroke is a hand-drawn graphite pencil line (see pencil.js): the
+  // same drawing, seeded by the body and the order things are drawn in, so it never changes between frames.
+  const pencil = theme.stroke === 'pencil';
+  let drawn = 0;
+  const stroke = (positions, color, amp = 0.012) => {
+    const s = pencilStrokes(positions, color, { seed: seed * 1009 + ++drawn * 17 + 3, amp });
+    for (const thing of s.own) tracker.own(thing);
+    return s.object;
+  };
+  const flat = (geometry) => { const p = geometry.attributes.position.array.slice(); geometry.dispose(); return p; };
+
   return {
     theme,
     additive: !!theme.additive,
+    pencil,     // hand-drawn strokes with a real width: a look can use fewer, bolder lines
     lit: false, // no shipped style does lighting, so looks skip shadows
     geometry: (key, factory) => tracker.geometry(key, factory),
 
@@ -200,19 +223,25 @@ export function makeKit(theme, tracker) {
 
     /** Every triangle of `geometry` as a line: the original body look. */
     wire(geometry, color) {
+      if (pencil) return stroke(flat(new THREE.WireframeGeometry(geometry)), color);
       return new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({ color, wireframe: true })));
     },
 
     /** The true polyhedron edges of `geometry` (no diagonals across flat faces). */
     edges(geometry, color) {
+      if (pencil) return stroke(flat(new THREE.EdgesGeometry(geometry, 1)), color);
       return new THREE.LineSegments(
         tracker.own(new THREE.EdgesGeometry(geometry, 1)),
         material(new THREE.LineBasicMaterial({ color })),
       );
     },
 
-    /** Loose line segments from a flat [x, y, z, x, y, z, ...] list (every two points make one). */
-    lines(positions, color) {
+    /**
+     * Loose line segments from a flat [x, y, z, x, y, z, ...] list (every two points make one).
+     * `amp` is how far a pencil stroke may wander, in unit radii (fine detail like numerals asks for less).
+     */
+    lines(positions, color, { amp = 0.012 } = {}) {
+      if (pencil) return stroke(positions, color, amp);
       const geometry = tracker.own(new THREE.BufferGeometry());
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       return new THREE.LineSegments(geometry, material(new THREE.LineBasicMaterial({ color })));
@@ -320,7 +349,7 @@ export function roundCore({ kit, color, settings, spinAxis }, deform = null) {
 
   if (stop.value >= HULL_FROM) {
     const group = new THREE.Group();
-    group.add(kit.outlined(geometry, color), kit.lines(contourLines(spinAxis), color));
+    group.add(kit.outlined(geometry, color), kit.lines(contourLines(spinAxis), color, { amp: 0.004 }));
     return group;
   }
   if (stop.value > DICE_MAX) return kit.wire(geometry, color); // 60 is the original body, bit for bit
@@ -328,7 +357,7 @@ export function roundCore({ kit, color, settings, spinAxis }, deform = null) {
   const edges = kit.edges(geometry, color);
   if (!settings.dice || deform) return edges;
   const group = new THREE.Group();
-  group.add(kit.occluder(geometry), edges, kit.lines(diceSegments(stop.value, geometry), color));
+  group.add(kit.occluder(geometry), edges, kit.lines(diceSegments(stop.value, geometry), color, { amp: 0.002 }));
   return group;
 }
 
@@ -565,8 +594,9 @@ function ringedPlanet(ctx) {
   // concentric circles across each band, lying in the plane perpendicular to the spin axis
   const SEG = 96;
   const out = [];
+  const step = kit.pencil ? RING_STEP * 2.2 : RING_STEP; // a wide pencil line needs more room between rings
   for (const [inner, outer] of RING_BANDS) {
-    const n = Math.max(1, Math.round((outer - inner) / RING_STEP));
+    const n = Math.max(1, Math.round((outer - inner) / step));
     for (let i = 0; i <= n; i++) {
       const r = inner + ((outer - inner) * i) / n;
       for (let k = 0; k < SEG; k++) {
@@ -655,9 +685,10 @@ function uprightUnit(object, spinAxis) {
   const v = new THREE.Vector3();
   let max = 0;
   object.traverse((o) => {
-    const pos = o.geometry && o.geometry.attributes && o.geometry.attributes.position;
-    if (!pos) return;
-    for (let i = 0; i < pos.count; i++) max = Math.max(max, v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).sub(centre).length());
+    if (!o.geometry) return;
+    for (const pos of vertexAttributes(o.geometry)) {
+      for (let i = 0; i < pos.count; i++) max = Math.max(max, v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).sub(centre).length());
+    }
   });
   const inner = new THREE.Group();
   inner.scale.setScalar(1 / max);
@@ -976,11 +1007,12 @@ function measureReach(root) {
   const v = new THREE.Vector3();
   let max2 = 0;
   root.traverse((o) => {
-    const pos = o.geometry && o.geometry.attributes && o.geometry.attributes.position;
-    if (!pos) return;
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
-      max2 = Math.max(max2, v.lengthSq());
+    if (!o.geometry) return;
+    for (const pos of vertexAttributes(o.geometry)) {
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        max2 = Math.max(max2, v.lengthSq());
+      }
     }
   });
   return Math.sqrt(max2);
@@ -995,7 +1027,7 @@ function measureReach(root) {
 export function createLook(settings, { theme, color, index, spinAxis }) {
   const def = resolveLook(settings.object);
   const tracker = makeTracker();
-  const kit = makeKit(theme, tracker);
+  const kit = makeKit(theme, tracker, index);
   const built = def.build({ kit, tracker, color, index, seed: index, spinAxis, settings, theme });
 
   // Moonlets work with any look: they join its decorations and ride its update.

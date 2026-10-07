@@ -34,6 +34,16 @@
 //               'unit' = match the style's screen-pixel grid (see pixelUnit below)
 //   inverse     true if the finished page is shown in inverse video (CSS inverts it), so a look that
 //               wants to *appear* black (a black hole) has to be drawn white here. Optional.
+//
+// Lab Notebook extras (all optional; the other styles leave them out)
+//   stroke      'pencil' = bodies, trails and the grid are hand-drawn graphite pencil lines with a real
+//               width (pencil.js) instead of 1-pixel lines
+//   paper       true = the background is a procedural sheet of graph paper (screen-fixed ruling and grain)
+//               instead of a flat colour; `background` is then the paper colour
+//   annot       colour of the red-pen annotations: the selection circle, centre-of-mass note, body labels,
+//               velocity arrows and z-height lines
+//   notes       true = hand-written annotations are drawn over the scene as an SVG overlay (notes.js)
+//   fx          'scribble' = collisions are a red scribbled starburst plus a short note, not a glowing burst
 
 // Shared by 'mac' and 'mac-dark': the same 1-bit frame, which the dark style inverts with CSS.
 const MAC_SCENE = {
@@ -101,9 +111,41 @@ export const THEMES = {
     tip: 'The same Mac desktop in inverse video: white on black',
     scene: { ...MAC_SCENE, inverse: true },
   },
+
+  // A physics lab notebook: graph paper, graphite pencil for the drawing, red ballpoint for the notes.
+  notebook: {
+    id: 'notebook',
+    label: 'Lab Notebook',
+    tip: 'Graph paper, graphite pencil and red-pen notes: a physics lab notebook',
+    scene: {
+      background: 0xf4f0e2,       // the paper
+      fadeTo: 0xffffff,           // trails fade by multiplying toward white: cream paper would be stained
+      additive: false,
+      ink: 0x3a3c42,             // graphite
+      grid: [0xa9aaa4, 0xc3c4be], // a lighter pencil than the bodies, so it does not fight the paper ruling
+      gridOpacity: 1,
+      gridMinPx: 46,
+      com: 0xc4262e,
+      comOpacity: 1,
+      select: 0xc4262e,
+      selectOpacity: 1,
+      zOpacity: 1,
+      trailEase: 1.2,
+      starColors: [0xb4b4ac, 0x8d8d86],
+      starDensity: 0.3,
+      bloom: 0,
+      dither: false,
+      pixelRatio: null,
+      stroke: 'pencil',
+      paper: true,
+      annot: 0xc4262e,            // red ballpoint
+      notes: true,
+      fx: 'scribble',
+    },
+  },
 };
 
-export const themeOrder = ['crt', 'mac', 'mac-dark'];
+export const themeOrder = ['crt', 'mac', 'mac-dark', 'notebook'];
 export const DEFAULT_THEME = 'crt';
 
 // Must match the key read by the inline script in index.html's <head>, which

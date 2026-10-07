@@ -12,8 +12,10 @@
 // runs.
 
 import * as THREE from 'three';
+import { pencilMesh } from './pencil.js';
+import { mulberry32 } from './noise.js';
 
-const POOL = 8;          // max simultaneous bursts
+const POOL = 8;         // max simultaneous bursts
 const PARTICLES = 140;   // debris points per burst
 const MAX_DT = 0.05;     // clamp so a long pause doesn't fast-forward a burst
 const WHITE = new THREE.Color(0xffffff);
@@ -46,21 +48,58 @@ export class ImpactFX {
     this._slots = [];
     this.setTheme(theme);
     for (let i = 0; i < POOL; i++) this._slots.push(this._makeSlot());
+    this._ensureStars();
   }
 
   /**
    * Light-emitting styles blend additively and tint each burst from the bodies'
    * colours; ink styles (`theme.ink` set) draw every burst in that one colour
    * with ordinary alpha blending, since additive light vanishes on a white page.
+   * A style with fx 'scribble' (the Lab Notebook) draws a red-pen starburst instead.
    */
   setTheme(theme) {
     this.ink = theme.ink ?? null;
     this.blending = theme.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    this.scribble = theme.fx === 'scribble';
+    this.annot = theme.annot ?? 0xc4262e;
     for (const slot of this._slots) {
       for (const part of [slot.shell, slot.flash, slot.points]) {
         part.material.blending = this.blending;
         part.material.needsUpdate = true;
       }
+      if (slot.star) { slot.star.visible = false; slot.star.material.color.set(this.annot); }
+    }
+    this._ensureStars();
+  }
+
+  // The scribble burst: spokes of uneven length round a small scribbled loop, drawn once as a unit-radius
+  // pencil mesh and then scaled and faded per burst. Built only when a style asks for it.
+  _ensureStars() {
+    if (!this.scribble) return;
+    for (const slot of this._slots) {
+      if (slot.star) continue;
+      const rand = mulberry32(slot.index * 131 + 9);
+      const seg = [];
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2 + (rand() - 0.5) * 0.25;
+        const r0 = 0.26 + rand() * 0.12;
+        const r1 = 0.78 + rand() * 0.4;
+        seg.push(r0 * Math.cos(a), r0 * Math.sin(a), 0, r1 * Math.cos(a), r1 * Math.sin(a), 0);
+      }
+      let prev = null;
+      for (let k = 0; k <= 22; k++) {            // a loose scribbled ring inside the spokes
+        const a = (k / 22) * Math.PI * 2 * 1.15;
+        const r = 0.2 + (rand() - 0.5) * 0.1;
+        const p = [r * Math.cos(a), r * Math.sin(a), 0];
+        if (prev) seg.push(...prev, ...p);
+        prev = p;
+      }
+      const { mesh, material } = pencilMesh(new Float32Array(seg), this.annot, 2.2, { transparent: true });
+      material.depthWrite = false;
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      slot.star = mesh;
     }
   }
 
@@ -88,7 +127,7 @@ export class ImpactFX {
 
     shell.visible = flash.visible = points.visible = false;
     this.group.add(shell, flash, points);
-    return { shell, flash, points, vel: new Float32Array(PARTICLES * 3), active: false, life: 0, maxLife: 1, shellR: 1, flashR: 1 };
+    return { index: this._slots.length, star: null, shell, flash, points, vel: new Float32Array(PARTICLES * 3), active: false, life: 0, maxLife: 1, shellR: 1, flashR: 1 };
   }
 
   /**
@@ -107,6 +146,14 @@ export class ImpactFX {
     slot.life = slot.maxLife;
     slot.shellR = 3 * scale;
     slot.flashR = (inked ? 4 : 6) * scale; // a black flash blots out more than a light one
+
+    if (this.scribble && slot.star) {      // a red-pen starburst: nothing else of the burst is drawn
+      slot.star.position.copy(point);
+      slot.star.scale.setScalar(0.01);
+      slot.star.material.opacity = 1;
+      slot.star.visible = true;
+      return;
+    }
 
     slot.shell.position.copy(point);
     slot.shell.scale.setScalar(0.01);
@@ -145,7 +192,7 @@ export class ImpactFX {
 
   // Advance every active burst. Driven off its own clock so bursts animate even
   // while the simulation is paused (you get to watch the blast settle).
-  update() {
+  update(camera = null) {
     const dt = Math.min(this._clock.getDelta(), MAX_DT);
     for (const slot of this._slots) {
       if (!slot.active) continue;
@@ -153,10 +200,18 @@ export class ImpactFX {
       if (slot.life <= 0) {
         slot.active = false;
         slot.shell.visible = slot.flash.visible = slot.points.visible = false;
+        if (slot.star) slot.star.visible = false;
         continue;
       }
       const t = 1 - slot.life / slot.maxLife;  // 0 -> 1 over the lifetime
       const ease = 1 - (1 - t) * (1 - t);      // easeOutQuad
+
+      if (slot.star && slot.star.visible) {    // scribble: grows, then the pen lifts
+        slot.star.scale.setScalar(Math.max(0.01, slot.shellR * ease));
+        slot.star.material.opacity = Math.min(1, (1 - t) * 1.6);
+        if (camera) slot.star.quaternion.copy(camera.quaternion); // faces the page
+        continue;
+      }
 
       slot.shell.scale.setScalar(Math.max(0.01, slot.shellR * ease));
       slot.shell.material.opacity = (1 - t) * 0.9;
@@ -186,6 +241,7 @@ export class ImpactFX {
     for (const slot of this._slots) {
       slot.active = false;
       slot.shell.visible = slot.flash.visible = slot.points.visible = false;
+      if (slot.star) slot.star.visible = false;
     }
     this._clock.getDelta();
   }
