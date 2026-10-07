@@ -5,6 +5,9 @@
 // arrow), the centre-of-mass crosshair, the "infinite" backdrop grid, the star
 // field, body picking/selection, and the post-processing (bloom / 1-bit dither).
 // It reads state from an NBodySystem each frame but never mutates it.
+//
+// Each body is drawn by a "look" (bodyLooks.js). The look's core spins in `coreNode`; any decorations
+// (rings, tails, ...) live in `decoNode`; and an invisible unit-sphere `proxy` is what clicks hit.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -15,8 +18,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { ImpactFX } from './effects.js';
 import { pixelUnit } from './themes.js';
+import { createLook, defaultLook, makeLookContext, makeOtherSlot } from './bodyLooks.js';
 
 const GRID_CELL = 10;
+const PICK_MIN_PX = 22;      // a body can be picked from at least this far away on screen...
+const PICK_MARGIN_PX = 6;    // ...or from this far beyond its visible edge, whichever is larger
 const TRAIL_CAPACITY = 4000; // max points buffered per trail
 const BASE_FOV = 60;
 const SURFACE_FOV = 90;      // wide lens when standing on a body (vertical degrees)
@@ -105,7 +111,13 @@ export class SimScene {
     this.trailLength = 600;
     this.selectedIndex = -1;
 
+    // picking: clicks are raycast against an invisible unit sphere per body (never the visible
+    // mesh), so thin or odd looks are still easy to hit
     this.raycaster = new THREE.Raycaster();
+    this._ndc = new THREE.Vector2();
+    this._proxyGeo = new THREE.SphereGeometry(1, 16, 12);
+    this._proxyMat = new THREE.MeshBasicMaterial({ visible: false });
+    this.looks = [];                       // per-body look settings (owned by the app, see main.js)
 
     this._buildGrid();
     this._buildCOM();
@@ -135,7 +147,6 @@ export class SimScene {
     this._com = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._tmp2 = new THREE.Vector3();
-    this._proj = new THREE.Vector3();
 
     // camera focus (see setCamera)
     this.cam = { focus: 'free', view: 'orbit' };
@@ -305,18 +316,21 @@ export class SimScene {
     this.selectionBox.material.opacity = theme.selectOpacity;
 
     this.fx.setTheme(theme);
-    for (const v of this.bodyVisuals) this._styleVisual(v);
+    for (const v of this.bodyVisuals) {
+      this._styleVisual(v);
+      this._restyleLook(v); // the look's materials depend on the style, so build it afresh
+    }
   }
 
   _inkFor(body) {
     return new THREE.Color(this.theme.ink ?? body.color);
   }
 
-  // (Re)apply the current style's colours and blending to one body's meshes.
+  // (Re)apply the current style's colours and blending to one body's trail, drop line and arrow.
+  // (The body itself is its look, rebuilt by _restyleLook.)
   _styleVisual(v) {
     v.color = this._inkFor(v.body);
     const hex = v.color.getHex();
-    v.mesh.material.color.copy(v.color);
     v.trail.material.blending = this.theme.additive ? THREE.AdditiveBlending : THREE.MultiplyBlending;
     v.trail.material.needsUpdate = true;
     v.zline.material.color.copy(v.color);
@@ -336,8 +350,12 @@ export class SimScene {
     this.fx.clear();
   }
 
-  /** (Re)create the per-body visuals to match the current system bodies. */
-  buildBodies(system) {
+  /**
+   * (Re)create the per-body visuals to match the current system bodies. `looks` is the app's array of
+   * per-body look settings; the scene keeps a reference and reads it whenever a look is (re)built.
+   */
+  buildBodies(system, looks) {
+    if (looks) this.looks = looks;
     for (const v of this.bodyVisuals) this._disposeVisual(v);
     for (const a of this.arrows) this.arrowGroup.remove(a);
     this.bodyVisuals = [];
@@ -348,13 +366,13 @@ export class SimScene {
     for (const [i, body] of system.bodies.entries()) {
       const color = this._inkFor(body);
 
-      // low-poly icosahedron (detail 1) for an early-CG wireframe look; unit
-      // geometry scaled per-frame from body.radius so live size edits are free
-      const mesh = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(1, 1),
-        new THREE.MeshBasicMaterial({ color, wireframe: true })
-      );
-      mesh.scale.setScalar(body.radius);
+      // The body is its look. coreNode carries the transform the old wireframe mesh had (position,
+      // spin, scale = physics radius, updated per frame so live size edits are free); the look's unit
+      // core sits inside it with an identity matrix. Decorations get their own, unspun node.
+      const coreNode = new THREE.Group();
+      const decoNode = new THREE.Group();
+      const proxy = new THREE.Mesh(this._proxyGeo, this._proxyMat);
+      proxy.userData.index = i;
 
       // trail: fixed-capacity buffer, drawn as a line whose vertex colour fades
       // from the body's ink at the head to the background colour at the tail
@@ -395,10 +413,16 @@ export class SimScene {
       );
       zline.frustumCulled = false;
 
-      this.scene.add(mesh, trail, zline);
+      this.scene.add(coreNode, decoNode, proxy, trail, zline);
       const { axis: spinAxis, rate: spinRate } = spinFor(i);
-      const visual = { body, mesh, trail, zline, arrow, color, points: [], spinAxis, spinRate, spin: 0 };
+      const visual = {
+        body, index: i, coreNode, decoNode, proxy, trail, zline, arrow, color, points: [],
+        spinAxis, spinRate, spin: 0,
+        spinQ: coreNode.quaternion, // the body's current spin (the surface camera rides it)
+        look: null, ctx: makeLookContext(),
+      };
       this._styleVisual(visual);
+      this._raiseLook(visual);
       this.bodyVisuals.push(visual);
     }
 
@@ -409,10 +433,69 @@ export class SimScene {
     this._camSettle = 40;
   }
 
+  // ---- looks ----
+
+  // Look settings for body `i`, defaulting if the app has not supplied any.
+  _settingsFor(i) {
+    return this.looks[i] || (this.looks[i] = defaultLook());
+  }
+
+  // Build body v's look from its settings and hang it on the scene graph.
+  _raiseLook(v) {
+    const look = createLook(this._settingsFor(v.index), {
+      theme: this.theme, color: v.color, index: v.index, spinAxis: v.spinAxis,
+    });
+    v.look = look;
+    v.coreNode.add(look.core);
+    if (look.decorations) v.decoNode.add(look.decorations);
+  }
+
+  // Take body v's look down and free everything it allocated (geometries, materials, textures...).
+  _dropLook(v) {
+    if (!v.look) return;
+    v.coreNode.remove(v.look.core);
+    if (v.look.decorations) v.decoNode.remove(v.look.decorations);
+    v.look.dispose();
+    v.look = null;
+  }
+
+  _restyleLook(v) {
+    this._dropLook(v);
+    if (!v.body.ejected) this._raiseLook(v);
+  }
+
+  /** Rebuild body `index`'s look after its settings (this.looks[index]) changed. */
+  setLook(index) {
+    const v = this.bodyVisuals[index];
+    if (v) this._restyleLook(v);
+  }
+
+  // Fill v's update context (copies only, so a look cannot reach back into the simulation).
+  _fillContext(v, dt) {
+    const c = v.ctx;
+    const b = v.body;
+    c.dt = dt;
+    c.body.index = v.index;
+    c.body.mass = b.mass; c.body.radius = b.radius;
+    c.body.pos.copy(b.pos); c.body.vel.copy(b.vel);
+    c.spinQ.copy(v.spinQ); c.spinAxis.copy(v.spinAxis); c.spinAngle = v.spin;
+    let k = 0;
+    for (const o of this.bodyVisuals) {
+      if (o === v) continue;
+      const slot = c.others[k] || (c.others[k] = makeOtherSlot());
+      slot.index = o.index;
+      slot.mass = o.body.mass; slot.radius = o.body.radius; slot.ejected = o.body.ejected;
+      slot.pos.copy(o.body.pos); slot.vel.copy(o.body.vel);
+      k++;
+    }
+    c.others.length = k;
+    c.theme = this.theme;
+    c.camera = this.camera;
+  }
+
   _disposeVisual(v) {
-    this.scene.remove(v.mesh, v.trail, v.zline);
-    v.mesh.geometry.dispose();
-    v.mesh.material.dispose();
+    this._dropLook(v);
+    this.scene.remove(v.coreNode, v.decoNode, v.proxy, v.trail, v.zline);
     v.trail.geometry.dispose();
     v.trail.material.dispose();
     v.zline.geometry.dispose();
@@ -422,40 +505,30 @@ export class SimScene {
   // ---- picking / selection ----
 
   /**
-   * Screen-space body pick (forgiving): returns the index of the closest active
-   * body whose projected centre is within a few pixels of (localX, localY), or
-   * -1. Coordinates are relative to the canvas top-left.
+   * Pick the body under (localX, localY), relative to the canvas top-left, or -1. The ray is cast
+   * against each body's invisible unit-sphere proxy, never its visible mesh or decorations, so a
+   * thin or oddly shaped look is as easy to click as a ball. Each proxy is sized to the body's
+   * physics radius, but never smaller than a forgiving patch of screen around it.
    */
   pickBody(localX, localY) {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-    let best = -1;
-    let bestDist = Infinity;
-    for (let i = 0; i < this.bodyVisuals.length; i++) {
-      const v = this.bodyVisuals[i];
-      if (v.body.ejected) continue;
-      this._proj.copy(v.body.pos).project(this.camera);
-      if (this._proj.z > 1) continue; // behind camera
-      const sx = (this._proj.x * 0.5 + 0.5) * w;
-      const sy = (-this._proj.y * 0.5 + 0.5) * h;
-      const d = Math.hypot(sx - localX, sy - localY);
-      // tolerance scales a little with on-screen size, min 22px
-      const screenR = Math.max(22, this._screenRadius(v.body));
-      if (d < screenR && d < bestDist) { best = i; bestDist = d; }
-    }
-    return best;
-  }
+    this._ndc.set((localX / w) * 2 - 1, -(localY / h) * 2 + 1);
+    this.raycaster.setFromCamera(this._ndc, this.camera);
 
-  _screenRadius(body) {
-    // project a point one radius to the camera's right and measure the offset
-    const h = this.container.clientHeight;
-    this._tmp.copy(this.camera.position).sub(body.pos);
-    const right = new THREE.Vector3().crossVectors(this.camera.up, this._tmp).normalize();
-    this._proj.copy(body.pos).project(this.camera);
-    const cy = (-this._proj.y * 0.5 + 0.5) * h;
-    this._proj.copy(body.pos).addScaledVector(right, body.radius).project(this.camera);
-    const ey = (-this._proj.y * 0.5 + 0.5) * h;
-    return Math.abs(ey - cy) + 6;
+    // world size of one screen pixel, per unit of distance from the camera
+    const perPixel = (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) / h;
+    const targets = [];
+    for (const v of this.bodyVisuals) {
+      if (v.body.ejected) continue;
+      const pixelWorld = perPixel * this.camera.position.distanceTo(v.body.pos);
+      v.proxy.position.copy(v.body.pos);
+      v.proxy.scale.setScalar(Math.max(PICK_MIN_PX * pixelWorld, v.body.radius + PICK_MARGIN_PX * pixelWorld));
+      v.proxy.updateMatrixWorld(true);
+      targets.push(v.proxy);
+    }
+    const hit = this.raycaster.intersectObjects(targets, false)[0];
+    return hit ? hit.object.userData.index : -1;
   }
 
   setSelected(index) {
@@ -497,14 +570,28 @@ export class SimScene {
 
     for (const v of this.bodyVisuals) {
       const visible = !v.body.ejected;
-      v.mesh.visible = visible;
+      // a body merged away has its look freed; Reset brings the body back and so its look
+      if (visible && !v.look) this._raiseLook(v);
+      else if (!visible && v.look) this._dropLook(v);
+
+      // standing on a body whose visible core would reach the camera: hide the core (the camera
+      // itself stays seated at the physics sphere)
+      const hideCore = v === ridden && v.look && v.look.coreReach > SURFACE_EYE;
+      v.coreNode.visible = visible && !hideCore;
+      v.decoNode.visible = visible;
       // cosmetic spin about the body's own axis; keeps going while the sim is paused (and a
       // surface camera turns with it, see _updateSurface)
       v.spin += v.spinRate * dt;
-      v.mesh.quaternion.setFromAxisAngle(v.spinAxis, v.spin);
+      v.spinQ.setFromAxisAngle(v.spinAxis, v.spin);
       if (visible) {
-        v.mesh.position.copy(v.body.pos);
-        v.mesh.scale.setScalar(v.body.radius);
+        v.coreNode.position.copy(v.body.pos);
+        v.coreNode.scale.setScalar(v.body.radius);
+        v.decoNode.position.copy(v.body.pos);
+        v.decoNode.scale.setScalar(v.body.radius);
+        if (v.look && v.look.update) {
+          this._fillContext(v, dt);
+          v.look.update(dt, v.ctx);
+        }
       }
 
       // drop line from the body down to its projection on the xy plane
@@ -761,7 +848,7 @@ export class SimScene {
   _updateSurface(v) {
     const cam = this.camera;
     const body = v.body;
-    const spin = v.mesh.quaternion; // the body's current spin (set in syncVisuals)
+    const spin = v.spinQ; // the body's current spin (set in syncVisuals)
 
     if (this._surfaceInit) {
       this._surfaceInit = false;

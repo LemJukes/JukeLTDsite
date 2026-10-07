@@ -12,6 +12,7 @@ import { SimScene } from './scene.js';
 import { createUI } from './ui.js';
 import { presets } from './presets.js';
 import { serializeSetup, parseSetup } from './io.js';
+import { defaultLook, sanitizeLook } from './bodyLooks.js';
 import { themeOrder, initialTheme, resolveTheme, saveTheme, applyPixelUnit } from './themes.js';
 
 const BASE_DT = 0.05;       // step size at quality = 1
@@ -37,6 +38,11 @@ const app = {
   // seeded from the default preset; the UI edits these in place
   custom: { bodies: presets.default.build().bodies.map(cloneCfg) },
 
+  // Cosmetic look of each body slot (see bodyLooks.js). Purely visual and kept apart from the
+  // physics: never snapshotted, never part of a body's starting state. It outlives preset loads
+  // and Reset; only an import replaces it.
+  looks: [0, 1, 2].map(defaultLook),
+
   _initial: [],
   _accum: 0,
   _lastTrail: 0,
@@ -50,7 +56,7 @@ const app = {
     this.setG(cfg.G ?? this.state.G);
     this.setSoftening(cfg.softening ?? this.state.softening);
     system.setBodies(cfg.bodies);
-    scene.buildBodies(system);
+    scene.buildBodies(system, this.looks);
     scene.clearTrails();
     this._initial = system.snapshot();
     this._lastImpact = null;
@@ -95,7 +101,7 @@ const app = {
     // literal setup — no momentum zeroing / recentre — so positions are exactly
     // as entered, matching the custom editor.
     system.setBodies(bodies, { normalize: false });
-    scene.buildBodies(system);
+    scene.buildBodies(system, this.looks);
     scene.clearTrails();
     this._initial = system.snapshot();
     this._lastImpact = null;
@@ -218,6 +224,22 @@ const app = {
     if (ev.severity >= 1) col.lerp(WHITE, Math.min(0.8, 0.2 + ev.severity / 20));
     scene.spawnImpact(ev.point, { severity: ev.severity, color: col });
     this._lastImpact = ev;
+  },
+
+  // ---- body looks ----
+  // Looks are cosmetic, so editing one never goes through the custom-body path above (which
+  // restarts the simulation): the sim keeps running exactly as it was.
+  setLook(i, patch) {
+    if (i < 0 || i >= this.looks.length) return;
+    Object.assign(this.looks[i], sanitizeLook({ ...this.looks[i], ...patch }));
+    scene.setLook(i);
+  },
+  applyLookToAll(i) {
+    const src = this.looks[i];
+    if (!src) return;
+    for (let k = 0; k < this.looks.length; k++) {
+      if (k !== i) this.setLook(k, src);
+    }
   },
 
   // ---- UI style ----
@@ -376,6 +398,9 @@ new ResizeObserver(() => scene.resize()).observe(container);
 // Display-scale / browser-zoom changes fire `resize`: re-publish the screen-pixel unit
 // (pixel-font styles size everything from it) and re-derive the render resolution.
 window.addEventListener('resize', () => { applyPixelUnit(); scene.resize(); });
+
+// ?debug exposes the controller for poking at from the console (leak / perf checks, tests)
+if (new URLSearchParams(location.search).has('debug')) window.__sim = { app, scene, system };
 
 // boot
 applyPixelUnit();
