@@ -233,6 +233,7 @@ const app = {
     if (i < 0 || i >= this.looks.length) return;
     Object.assign(this.looks[i], sanitizeLook({ ...this.looks[i], ...patch }));
     scene.setLook(i);
+    ui.syncLook(); // keep the editor's controls in step, whoever made the change
   },
   applyLookToAll(i) {
     const src = this.looks[i];

@@ -392,6 +392,54 @@ html[data-theme^='mac'] .tgl input:checked + .tgl-box {
   box-shadow: none;
 }
 
+/* ---------- popup menu ---------- */
+html[data-theme^='mac'] .menu-row { margin: calc(var(--px) * 7) 0; }
+html[data-theme^='mac'] .menu-label { margin-bottom: calc(var(--px) * 3); text-transform: none; }
+html[data-theme^='mac'] .menu-btn {
+  padding: calc(var(--px) * 3) calc(var(--px) * 6) calc(var(--px) * 4) calc(var(--px) * 8);
+  line-height: 1.1;
+  text-transform: none;
+  color: #000;
+  background: #fff;
+  border: var(--bw) solid #000;
+  box-shadow: var(--px) var(--px) 0 #000;     /* the classic popup: a box with a hard shadow */
+  transition: none;
+}
+html[data-theme^='mac'] .menu-btn:hover { background: #fff; box-shadow: var(--px) var(--px) 0 #000; }
+html[data-theme^='mac'] .menu-btn[aria-expanded='true'] { color: #fff; background: #000; }
+html[data-theme^='mac'] .menu-caret {
+  width: calc(var(--px) * 9);
+  height: calc(var(--px) * 5);
+  border: 0;
+  background: currentColor;
+  -webkit-mask: var(--ico-down) center / 100% 100% no-repeat;
+          mask: var(--ico-down) center / 100% 100% no-repeat;
+}
+/* the open list is a menu: black frame, hard shadow, the highlighted item in inverse video */
+html[data-theme^='mac'] .menu-list {
+  padding: 0;
+  background: #fff;
+  border: var(--bw) solid #000;
+  box-shadow: var(--sh) var(--sh) 0 #000;
+}
+html[data-theme^='mac'] .menu-item {
+  padding: calc(var(--px) * 2) calc(var(--px) * 12) calc(var(--px) * 3) calc(var(--px) * 20);
+  line-height: 1.15;
+  text-transform: none;
+  color: #000;
+}
+html[data-theme^='mac'] .menu-item.active { color: #fff; background: #000; }
+html[data-theme^='mac'] .menu-item[aria-selected='true']::before {
+  content: '';
+  left: calc(var(--px) * 5);
+  top: 50%;
+  width: calc(var(--px) * 9);
+  height: calc(var(--px) * 9);
+  margin-top: calc(var(--px) * -4.5);
+  background: var(--ico-check) center / 100% 100% no-repeat;
+}
+html[data-theme^='mac'] .menu-item.active[aria-selected='true']::before { filter: invert(1); }
+
 /* ---------- look controls ---------- */
 /* the Shape slider has fixed stops: its tick row replaces the free-running tick marks */
 html[data-theme^='mac'] .stops-slider input[type='range']::-webkit-slider-runnable-track {

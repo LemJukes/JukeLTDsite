@@ -157,13 +157,14 @@ export function makeKit(theme, tracker) {
      * A solid ball with a crisp outline of constant pixel width: a fill in the page colour with a
      * back-face hull behind it, pushed outward in clip space. Reads as a smooth circle however fine
      * the mesh, and solid ink survives the 1-bit dither where a dense wireframe would clot.
+     * `fill` is the colour of the ball itself (the page colour unless a look wants it solid).
      */
-    outlined(geometry, color) {
+    outlined(geometry, color, fill = theme.background) {
       const group = new THREE.Group();
-      const fill = new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({
-        color: theme.background, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+      const body = new THREE.Mesh(geometry, material(new THREE.MeshBasicMaterial({
+        color: fill, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       })));
-      fill.renderOrder = -0.5;
+      body.renderOrder = -0.5;
       const hullMat = material(new THREE.ShaderMaterial({
         side: THREE.BackSide,
         uniforms: { uColor: { value: new THREE.Color(color) }, uPx: { value: 2 }, uViewport: { value: new THREE.Vector2(1, 1) } },
@@ -191,7 +192,7 @@ export function makeKit(theme, tracker) {
         else renderer.getDrawingBufferSize(hullMat.uniforms.uViewport.value);
         hullMat.uniforms.uPx.value = theme.pixelRatio === 'unit' ? 2 : 1.5 * renderer.getPixelRatio();
       };
-      group.add(fill, hull);
+      group.add(body, hull);
       return group;
     },
   };
@@ -248,6 +249,102 @@ export function roundCore({ kit, color, settings, spinAxis }) {
   return group;
 }
 
+// ---- black hole -------------------------------------------------------------
+
+const DISK_INNER = 1.45;   // accretion disk, in units of the horizon radius
+const DISK_OUTER = 4.2;
+
+const DISK_VERTEX = /* glsl */`
+  varying vec3 vLocal;
+  varying vec3 vWorld;
+  void main() {
+    vLocal = position;
+    vec4 w = modelMatrix * vec4(position, 1.0);
+    vWorld = w.xyz;
+    gl_Position = projectionMatrix * viewMatrix * w;
+  }`;
+
+// Brightest at the inner edge, banded gas sliding round faster the closer it is, and relativistic
+// beaming (D^3) so the side moving toward the camera is far brighter than the side moving away. The
+// bright side follows the camera as you orbit. Light styles add heat-coloured light; ink styles draw
+// the same intensity as ink density, which the 1-bit dither turns into stipple.
+const DISK_FRAGMENT = /* glsl */`
+  uniform float uTime;
+  uniform vec3 uCenter;
+  uniform vec3 uAxis;
+  uniform vec3 uColor;
+  uniform float uAdditive;
+  uniform float uInner;
+  uniform float uOuter;
+  varying vec3 vLocal;
+  varying vec3 vWorld;
+  void main() {
+    float r = length(vLocal.xy);
+    float t = clamp((r - uInner) / (uOuter - uInner), 0.0, 1.0);
+    float ang = atan(vLocal.y, vLocal.x);
+    float kepler = pow(uInner / max(r, 1e-3), 1.5);
+    float swirl = 0.5 + 0.5 * sin(3.0 * ang - uTime * 2.4 * kepler + r * 4.0);
+    float fine = 0.5 + 0.5 * sin(11.0 * ang - uTime * 3.1 * kepler - r * 9.0);
+    float radial = pow(1.0 - t, 1.7);
+    float edge = smoothstep(0.0, 0.04, t) * (1.0 - smoothstep(0.8, 1.0, t));
+
+    vec3 out_ = vWorld - uCenter;
+    out_ -= uAxis * dot(out_, uAxis);
+    vec3 gas = cross(uAxis, normalize(out_));
+    vec3 toCam = normalize(cameraPosition - vWorld);
+    float beta = clamp(0.58 * sqrt(uInner / max(r, 1e-3)), 0.0, 0.9);
+    float D = sqrt(1.0 - beta * beta) / (1.0 - beta * dot(gas, toCam));
+    float I = radial * (0.6 + 0.3 * swirl + 0.1 * fine) * edge * D * D * D;
+
+    if (uAdditive > 0.5) {
+      vec3 hot = mix(vec3(1.0, 0.97, 0.88), uColor, smoothstep(0.0, 0.8, t));
+      gl_FragColor = vec4(hot, clamp(I * 0.5, 0.0, 1.0));
+    } else {
+      gl_FragColor = vec4(uColor, clamp(I * 0.9, 0.0, 1.0));
+    }
+  }`;
+
+function blackHole({ kit, tracker, color, spinAxis }) {
+  // the event horizon: a black ball, or white where the page is shown in inverse video
+  const sphere = kit.geometry('shape:100', () => buildShapeGeometry(100));
+  const core = kit.outlined(sphere, color, kit.theme.inverse ? kit.theme.background : 0x000000);
+
+  const axis = spinAxis.clone().normalize();
+  const uniforms = {
+    uTime: { value: 0 },
+    uCenter: { value: new THREE.Vector3() },
+    uAxis: { value: axis },
+    uColor: { value: new THREE.Color(color) },
+    uAdditive: { value: kit.additive ? 1 : 0 },
+    uInner: { value: DISK_INNER },
+    uOuter: { value: DISK_OUTER },
+  };
+  const disk = new THREE.Mesh(
+    tracker.own(new THREE.RingGeometry(DISK_INNER, DISK_OUTER, 160, 8)),
+    tracker.own(new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: DISK_VERTEX,
+      fragmentShader: DISK_FRAGMENT,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: kit.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    })),
+  );
+  disk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis); // ring normal = spin axis
+  const decorations = new THREE.Group();
+  decorations.add(disk);
+
+  return {
+    core,
+    decorations,
+    update(dt, ctx) {
+      uniforms.uTime.value += dt;
+      uniforms.uCenter.value.copy(ctx.body.pos);
+    },
+  };
+}
+
 // ---- registry ---------------------------------------------------------------
 
 export const LOOKS = {
@@ -259,6 +356,14 @@ export const LOOKS = {
     build(ctx) {
       return { core: roundCore(ctx) };
     },
+  },
+
+  blackhole: {
+    id: 'blackhole',
+    label: 'Black hole',
+    tip: 'A black event horizon with a glowing accretion disk, bending the background behind it',
+    usesDetail: false,
+    build: blackHole,
   },
 };
 

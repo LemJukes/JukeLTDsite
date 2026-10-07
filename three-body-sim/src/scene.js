@@ -19,6 +19,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { ImpactFX } from './effects.js';
 import { pixelUnit } from './themes.js';
 import { createLook, defaultLook, makeLookContext, makeOtherSlot } from './bodyLooks.js';
+import { LensPass, MAX_HOLES } from './lens.js';
 
 const GRID_CELL = 10;
 const PICK_MIN_PX = 22;      // a body can be picked from at least this far away on screen...
@@ -276,8 +277,22 @@ export class SimScene {
     const size = new THREE.Vector2();
     this.renderer.getSize(size);
 
-    this.composer = new EffectComposer(this.renderer);
+    // The composer's targets carry a depth texture so the lens pass can tell what lies behind a black
+    // hole from what is in front of it (the targets are cloned, depth texture included, for ping-pong).
+    const pr = this.renderer.getPixelRatio();
+    const target = new THREE.WebGLRenderTarget(size.x * pr, size.y * pr, {
+      type: THREE.HalfFloatType,
+      depthTexture: new THREE.DepthTexture(size.x * pr, size.y * pr),
+    });
+    this.composer = new EffectComposer(this.renderer, target);
+    // clone() leaves both targets pointing at one depth image (and so one GL texture): reading the
+    // scene depth while writing the other target would then be a feedback loop. Give the second its own.
+    this.composer.renderTarget2.depthTexture = new THREE.DepthTexture(size.x * pr, size.y * pr);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+    // gravitational lensing for black-hole looks: before bloom / output / dither, off when unused
+    this.lensPass = new LensPass();
+    this.composer.addPass(this.lensPass);
 
     // subtle glow only — enough to feel like a phosphor/vector display without
     // washing out the crisp wireframes
@@ -746,6 +761,15 @@ export class SimScene {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
+    // the targets' depth textures are not resized with them (the lens pass samples them): do it here
+    for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) {
+      const d = t.depthTexture;
+      if (d.image.width !== t.width || d.image.height !== t.height) {
+        d.image.width = t.width;
+        d.image.height = t.height;
+        d.dispose();
+      }
+    }
     this._styleStars(); // star sizes are in whole render pixels, which depend on the pixel ratio
   }
 
@@ -920,6 +944,33 @@ export class SimScene {
     dom.addEventListener('pointercancel', end);
   }
 
+  // Hand the lens pass this frame's black holes (those on screen, not the one you are standing on).
+  _updateLens() {
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const ridden = this.cam.view === 'surface' ? this.bodyVisuals[this.cam.focus] : null;
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    const holes = [];
+    for (const v of this.bodyVisuals) {
+      if (holes.length >= MAX_HOLES) break;
+      if (!v.look || v.look.def.id !== 'blackhole' || v.body.ejected || v === ridden) continue;
+      const dist = -this._tmp.copy(v.body.pos).applyMatrix4(cam.matrixWorldInverse).z; // along the view axis
+      if (dist < cam.near * 2) continue;
+      const horizon = v.body.radius / (2 * dist * tanHalf);                    // in screen heights
+      const einstein = horizon * (1.3 + 0.35 * Math.sqrt(v.body.mass));       // bigger mass, wider bending
+      const ndc = this._tmp2.copy(v.body.pos).project(cam);
+      const u = ndc.x * 0.5 + 0.5;
+      const w = ndc.y * 0.5 + 0.5;
+      const reach = 6 * einstein;                                              // how far the bending reaches
+      if (u * cam.aspect < -reach || (1 - u) * cam.aspect < -reach || w < -reach || 1 - w < -reach) continue;
+      // anything nearer than the hole's centre is in front of it: the near half of its disk, a body
+      // passing in front. Only what lies behind is bent or hidden in the shadow.
+      // (a margin of a quarter radius keeps the horizon's own rim, which sits at about that depth, out of it)
+      holes.push({ u, v: w, horizon, einstein, zFront: dist - 0.25 * v.body.radius });
+    }
+    this.lensPass.setHoles(holes, cam, this.theme);
+  }
+
   render() {
     const anchor = this._focusPoint();
     if (!anchor) {
@@ -934,6 +985,7 @@ export class SimScene {
     this.stars.position.copy(this.camera.position); // keep the sky at infinity
     this._updateGrid();
     this.fx.update();
+    this._updateLens();
     this.composer.render();
   }
 }

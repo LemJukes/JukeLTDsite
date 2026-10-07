@@ -8,7 +8,7 @@
 import { presets, presetOrder, COLORS } from './presets.js';
 import { THEMES, themeOrder } from './themes.js';
 import { hasIcon, iconSvg } from './icons.js';
-import { LOOKS } from './bodyLooks.js';
+import { LOOKS, lookOrder } from './bodyLooks.js';
 import { SHAPE_STOPS, DICE_MAX, stopFor } from './shapes.js';
 
 // ---- tiny DOM helpers -------------------------------------------------------
@@ -83,6 +83,131 @@ function toggle(label, checked, onchange, tip) {
   const node = el('label', { class: 'tgl' }, [input, box, el('span', { text: label })]);
   if (tip) node.setAttribute('data-tip', tip);
   return { node, input };
+}
+
+// A popup menu (a dropdown): a button showing the current choice that opens a list of options.
+// It is built from plain elements rather than a native <select>, because the OS draws a select's list
+// and no UI style could skin it (the 1-bit Mac look needs a menu drawn in black and white). Like the
+// tooltip, the list is mounted on <body> so the scrolling control panel never clips it.
+//   keyboard: Down/Up on the button open it; in the list Up/Down/Home/End move, Enter or Space picks,
+//   Esc closes, typing jumps to a matching option.
+// options: [{ id, label, tip }]
+let menuCount = 0;
+function popupMenu(label, options, value, onchange, tip) {
+  const listId = `menu-list-${++menuCount}`;
+  const text = el('span', { class: 'menu-text' });
+  const trigger = el('button', {
+    class: 'menu-btn', type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false', 'aria-controls': listId,
+  }, [text, el('span', { class: 'menu-caret', 'aria-hidden': 'true' })]);
+  const list = el('ul', { class: 'menu-list hidden', id: listId, role: 'listbox', tabindex: '-1' });
+  const items = options.map((o, i) => {
+    const li = el('li', { class: 'menu-item', role: 'option', id: `${listId}-${i}`, text: o.label });
+    if (o.tip) li.setAttribute('data-tip', o.tip);
+    li.addEventListener('click', () => choose(i));
+    li.addEventListener('pointermove', () => highlight(i));
+    list.appendChild(li);
+    return li;
+  });
+  document.body.appendChild(list);
+
+  let current = options.findIndex((o) => o.id === value);
+  if (current < 0) current = 0;
+  let active = current;
+  let isOpen = false;
+  let typed = '';
+  let typedAt = 0;
+
+  const render = () => {
+    text.textContent = options[current].label;
+    items.forEach((li, i) => li.setAttribute('aria-selected', String(i === current)));
+  };
+  const highlight = (i) => {
+    active = (i + options.length) % options.length;
+    items.forEach((li, k) => li.classList.toggle('active', k === active));
+    list.setAttribute('aria-activedescendant', items[active].id);
+    // keep the highlight inside a scrolling list (not scrollIntoView, which can scroll the page behind it)
+    const top = items[active].offsetTop;
+    const bottom = top + items[active].offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  };
+  const place = () => {
+    const r = trigger.getBoundingClientRect();
+    list.style.minWidth = r.width + 'px';
+    list.style.left = r.left + 'px';
+    const h = list.offsetHeight;
+    // below the button, or above it when there is no room
+    const top = r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 2) : r.bottom + 2;
+    list.style.top = top + 'px';
+  };
+  const scroller = document.getElementById('panel-body'); // the list closes if the panel scrolls under it
+  const onOutside = (e) => { if (!list.contains(e.target) && !trigger.contains(e.target)) close(false); };
+  const onScroll = () => close(false);
+  function open() {
+    if (isOpen) return;
+    isOpen = true;
+    list.classList.remove('hidden');
+    place();
+    highlight(current);
+    trigger.setAttribute('aria-expanded', 'true');
+    list.focus({ preventScroll: true });
+    document.addEventListener('pointerdown', onOutside, true);
+    window.addEventListener('resize', onScroll);
+    scroller.addEventListener('scroll', onScroll);
+  }
+  function close(refocus = true) {
+    if (!isOpen) return;
+    isOpen = false;
+    list.classList.add('hidden');
+    trigger.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', onOutside, true);
+    window.removeEventListener('resize', onScroll);
+    scroller.removeEventListener('scroll', onScroll);
+    if (refocus) trigger.focus({ preventScroll: true });
+  }
+  function choose(i) {
+    const changed = i !== current;
+    current = i;
+    render();
+    close();
+    if (changed) onchange(options[i].id);
+  }
+
+  // if focus leaves the open list (for anywhere but its own button) the menu closes, so it never sits
+  // open while its keys go elsewhere
+  list.addEventListener('focusout', (e) => {
+    if (isOpen && !list.contains(e.relatedTarget) && e.relatedTarget !== trigger) close(false);
+  });
+  trigger.addEventListener('click', () => (isOpen ? close() : open()));
+  trigger.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+  });
+  list.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k === 'ArrowDown') highlight(active + 1);
+    else if (k === 'ArrowUp') highlight(active - 1);
+    else if (k === 'Home') highlight(0);
+    else if (k === 'End') highlight(options.length - 1);
+    else if (k === 'Enter' || k === ' ') choose(active);
+    else if (k === 'Escape') close();
+    else if (k === 'Tab') { close(false); return; }
+    else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const now = performance.now();
+      typed = now - typedAt < 700 ? typed + k.toLowerCase() : k.toLowerCase();
+      typedAt = now;
+      const from = typed.length === 1 ? active + 1 : active; // repeating one letter steps through its matches
+      for (let n = 0; n < options.length; n++) {
+        const i = (from + n) % options.length;
+        if (options[i].label.toLowerCase().startsWith(typed)) { highlight(i); break; }
+      }
+    } else return;
+    e.preventDefault();
+  });
+
+  render();
+  const row = el('div', { class: 'menu-row' }, [el('span', { class: 'menu-label', text: label }), trigger]);
+  if (tip) row.setAttribute('data-tip', tip);
+  return { row, set(id) { const i = options.findIndex((o) => o.id === id); if (i >= 0) { current = i; render(); } } };
 }
 
 // A single floating tooltip, shown for any element (or ancestor) with [data-tip].
@@ -346,16 +471,20 @@ export function createUI(app) {
   const SHAPE_TIP = 'Shape of the round body. Snaps to fixed stops: the dice solids, then geodesic spheres, then a smooth ball. Cosmetic only.';
   const DICE_TIP = 'Number the faces like a real die: opposite faces add up to one more than the face count (d4 is read at the corners, d10 runs 0-9).';
   const shapeS = slider('Shape', { min: 0, max: 100, step: 10, value: 60, format: (v) => stopFor(v).short, tip: SHAPE_TIP },
-    (v) => { app.setLook(editIndex, { shape: v }); syncLook(); });
+    (v) => app.setLook(editIndex, { shape: v }));
   shapeS.row.classList.add('stops-slider');
   const shapeCaption = el('div', { class: 'shape-caption' });
   shapeS.row.append(
     el('div', { class: 'stops', 'aria-hidden': 'true' }, SHAPE_STOPS.map(() => el('span'))),
     shapeCaption,
   );
-  const diceT = toggle('Dice faces', false, (v) => { app.setLook(editIndex, { dice: v }); syncLook(); }, DICE_TIP);
+  const diceT = toggle('Dice faces', false, (v) => app.setLook(editIndex, { dice: v }), DICE_TIP);
+  const objectM = popupMenu('Object', lookOrder.map((id) => ({ id, label: LOOKS[id].label, tip: LOOKS[id].tip })), 'body',
+    (id) => app.setLook(editIndex, { object: id }),
+    'What this body looks like. Purely cosmetic: its mass, size and gravity do not change.');
   const lookBox = el('div', { class: 'custom-body look-box' }, [
     el('div', { class: 'custom-body-title', text: 'Look' }),
+    objectM.row,
     shapeS.row,
     diceT.node,
   ]);
@@ -365,6 +494,7 @@ export function createUI(app) {
     const look = app.looks[editIndex];
     const def = LOOKS[look.object];
     const stop = stopFor(look.shape);
+    objectM.set(look.object);
     shapeS.set(look.shape);
     shapeCaption.textContent = [stop.label, stop.die, stop.faces].filter(Boolean).join(' · ');
     const hasShape = def.usesDetail;
@@ -559,6 +689,10 @@ export function createUI(app) {
   // ---------- keyboard ----------
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
+    // a popup menu owns its keys while it is open (Esc closes it instead of deselecting the body)
+    // and the keys that operate its button
+    if (e.target.closest?.('.menu-list')) return;
+    if (e.target.closest?.('.menu-btn') && [' ', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
     switch (e.key.toLowerCase()) {
       case ' ': e.preventDefault(); app.toggle(); break;
       case 'r': app.reset(); break;

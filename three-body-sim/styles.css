@@ -288,6 +288,67 @@ input[type='range']::-moz-range-thumb {
 .swatch { width: 10px; height: 10px; box-shadow: 0 0 6px currentColor; display: inline-block; }
 .custom-body .slider { margin: 5px 0; }
 
+/* popup menu (a dropdown): a button that opens a list mounted on <body> (see popupMenu in ui.js) */
+.menu-row { display: block; margin: 9px 0; }
+.menu-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--green);
+  background: rgba(77, 255, 136, 0.05);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.menu-btn:hover, .menu-btn[aria-expanded='true'] { background: rgba(77, 255, 136, 0.16); box-shadow: var(--glow); }
+.menu-caret {
+  flex: 0 0 auto;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+}
+.menu-list {
+  position: fixed;
+  z-index: 45;
+  margin: 0;
+  padding: 3px 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  list-style: none;
+  background: rgba(2, 12, 8, 0.97);
+  border: 1px solid var(--line);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+  outline: none;
+}
+.menu-list.hidden { display: none; }
+.menu-item {
+  position: relative;
+  padding: 5px 12px 5px 22px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--green);
+  cursor: pointer;
+}
+.menu-item.active { color: var(--bg); background: var(--green); }
+.menu-item[aria-selected='true']::before { content: '>'; position: absolute; left: 9px; }
+
 /* look controls (selected body): the shape slider snaps to fixed stops, shown as a tick row under it */
 .look-box { margin-top: 10px; }
 .stops {

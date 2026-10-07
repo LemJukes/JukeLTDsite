@@ -32,6 +32,30 @@
 //   dither      true = finish with a 1-bit ordered-dither pass (pure black/white)
 //   pixelRatio  render resolution multiplier; null = device pixel ratio (max 2);
 //               'unit' = match the style's screen-pixel grid (see pixelUnit below)
+//   inverse     true if the finished page is shown in inverse video (CSS inverts it), so a look that
+//               wants to *appear* black (a black hole) has to be drawn white here. Optional.
+
+// Shared by 'mac' and 'mac-dark': the same 1-bit frame, which the dark style inverts with CSS.
+const MAC_SCENE = {
+  background: 0xffffff,
+  fadeTo: 0xffffff,
+  additive: false,
+  ink: 0x000000,
+  grid: [0x000000, 0x000000],
+  gridOpacity: 1,
+  gridMinPx: 28,
+  com: 0x000000,
+  comOpacity: 1,
+  select: 0x000000,
+  selectOpacity: 1,
+  zOpacity: 1,
+  trailEase: 1.3,
+  starColors: [0x000000, 0x000000],
+  starDensity: 0.5,
+  bloom: 0,
+  dither: true,
+  pixelRatio: 'unit',
+};
 
 export const THEMES = {
   crt: {
@@ -64,37 +88,18 @@ export const THEMES = {
     id: 'mac',
     label: 'Classic Mac',
     tip: 'Black-and-white System 6/7 desktop: windows, menu bar, 1-bit dithering',
-    scene: {
-      background: 0xffffff,
-      fadeTo: 0xffffff,
-      additive: false,
-      ink: 0x000000,
-      grid: [0x000000, 0x000000],
-      gridOpacity: 1,
-      gridMinPx: 28,
-      com: 0x000000,
-      comOpacity: 1,
-      select: 0x000000,
-      selectOpacity: 1,
-      zOpacity: 1,
-      trailEase: 1.3,
-      starColors: [0x000000, 0x000000],
-      starDensity: 0.5,
-      bloom: 0,
-      dither: true,
-      pixelRatio: 'unit',
-    },
+    scene: MAC_SCENE,
   },
 
   // The same desktop in inverse video. The page is drawn exactly as in 'mac' and themes/mac.css
   // inverts the whole thing (filter: invert), which for a pure black/white bitmap is exact: white
   // ink on black, black-on-white buttons become white-on-black, and so on. So the 3D scene is
-  // deliberately the unchanged light one.
+  // the unchanged light one, flagged `inverse` for the few things that must end up black.
   'mac-dark': {
     id: 'mac-dark',
     label: 'Classic Mac (Dark)',
     tip: 'The same Mac desktop in inverse video: white on black',
-    get scene() { return THEMES.mac.scene; },
+    scene: { ...MAC_SCENE, inverse: true },
   },
 };
 
