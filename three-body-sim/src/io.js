@@ -19,8 +19,15 @@
 //   * Cap the input size and require exactly three bodies.
 // The output is a plain, normalised config object that holds only numbers and
 // short sanitised strings — nothing that can be executed or injected.
+//
+// Each body may carry a cosmetic `look` ({ object, shape, dice, moonlets, moonletCount }, see
+// bodyLooks.js). It is optional (a file without one loads with the default look) and read through
+// sanitizeLook, which whitelists the object id, snaps the shape to a valid stop, coerces the flags to
+// booleans and clamps the count. Older versions of this app ignore the extra key, so no existing field
+// changed and the format version stays 1.
 
 import { COLORS } from './presets.js';
+import { sanitizeLook } from './bodyLooks.js';
 
 export const SETUP_FORMAT = '3bsim';
 export const SETUP_VERSION = 1;
@@ -116,13 +123,14 @@ export function serializeSetup(app) {
     ? app._initial
     : app.system.bodies;
 
-  const bodies = snap.map((b) => ({
+  const bodies = snap.map((b, i) => ({
     name: b.name,
     mass: tidy(b.mass),
     radius: tidy(b.radius),
     color: colorToHex(b.color),
     pos: [tidy(b.pos.x), tidy(b.pos.y), tidy(b.pos.z)],
     vel: [tidy(b.vel.x), tidy(b.vel.y), tidy(b.vel.z)],
+    look: sanitizeLook(app.looks && app.looks[i]),
   }));
 
   const setup = {
@@ -144,8 +152,8 @@ export function serializeSetup(app) {
 /**
  * Parse and validate setup text into a normalised config object.
  * Throws {@link SetupError} with a friendly message on anything malformed.
- * Missing optional fields fall back to sensible defaults; only `bodies` (exactly
- * three) is required.
+ * Missing optional fields fall back to sensible defaults (a missing `look` is the
+ * default look); only `bodies` (exactly three) is required.
  * @param {string} text
  * @returns {{G:number, softening:number, speed:number, substeps:number,
  *            trailLength:number, collisionMode:string, restitution:number,
@@ -184,6 +192,7 @@ export function parseSetup(text) {
       color: parseColor(o.color, COLORS[i]),
       pos: readTriple(o.pos, RANGES.pos),
       vel: readTriple(o.vel, RANGES.vel),
+      look: sanitizeLook(o.look),
     };
   });
 

@@ -98,6 +98,8 @@ const app = {
     this.setRestitution(cfg.restitution);
 
     this.custom.bodies = bodies.map(cloneCfg);
+    // the file's looks replace the current ones (in place: the scene holds this same array)
+    cfg.bodies.forEach((b, i) => Object.assign(this.looks[i], b.look));
     // literal setup — no momentum zeroing / recentre — so positions are exactly
     // as entered, matching the custom editor.
     system.setBodies(bodies, { normalize: false });
@@ -112,6 +114,7 @@ const app = {
     this.deselect();
     ui.setActivePreset('custom');
     ui.syncParams();
+    ui.syncLook();
   },
 
   // ---- body selection / editing ----
