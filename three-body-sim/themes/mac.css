@@ -1,0 +1,532 @@
+/* themes/mac.css — "Classic Mac" UI styles: a 1-bit black-and-white System 6/7 desktop.
+ *
+ * Everything is scoped to html[data-theme^='mac'] (set from src/themes.js), which matches both
+ * 'mac' (black on white) and 'mac-dark' (the same thing in inverse video), so it only applies
+ * when one of those styles is chosen. The matching 3D look (white page, black ink, 1-bit
+ * dithering) is the `mac` entry in src/themes.js.
+ *
+ * Only pure #000 / #fff are used. Greys are real dither patterns (the --pat-* PNGs below, drawn
+ * with image-rendering: pixelated), the way a 1-bit Mac display made them.
+ *
+ * One "screen pixel" (--px) is the unit for every size here. src/themes.js sets --px so that it is
+ * a whole number of device pixels at any display scaling (125% Windows scaling, retina, browser
+ * zoom), which keeps the bitmap type, 1px rules and dither patterns crisp instead of smeared.
+ * The pixel face (Jersey 15) has a 15-pixel em, so --fs = 15 screen pixels.
+ */
+
+html[data-theme^='mac'] {
+  --px: 1px;                                   /* overwritten from JS; see themes.js applyPixelUnit() */
+  --fs: calc(var(--px) * 15);
+  --bw: calc(var(--px) + 0.02px);              /* a 1-pixel line (the sliver keeps browsers from rounding down) */
+  --bw2: calc(var(--px) * 2 + 0.02px);         /* a 2-pixel line */
+  --sh: calc(var(--px) * 2);                   /* window drop-shadow offset */
+
+  --ink: #000;
+  --paper: #fff;
+  --corner: #000;                              /* the rounded screen corners (the bezel) */
+
+  /* the shared variables the default style uses, collapsed to black & white */
+  --green: #000;
+  --green-dim: #000;
+  --amber: #000;
+  --cyan: #000;
+  --blue: #000;
+  --bg: #fff;
+  --panel-bg: #fff;
+  --line: #000;
+  --line-soft: #000;
+  --glow: none;
+  --sev-merge: #000;
+  --sev-disruption: #000;
+  --sev-catastrophic: #000;
+
+  --font: 'Jersey 15', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --mono: var(--font);
+  --display: var(--font);
+
+  /* layout */
+  --menubar-h: calc(var(--px) * 20);
+  --title-h: calc(var(--px) * 19);
+  --gap: calc(var(--px) * 10);
+  --panel-w: calc(var(--px) * 290);
+  --win-top: calc(var(--menubar-h) + var(--gap));
+
+  /* 1-bit dither patterns (2x2 / 1x2 PNGs; size them in screen pixels) */
+  --pat-gray50: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACAQAAAABazTCJAAAADElEQVR42mNwYGgAAAFEAMEEh8/6AAAAAElFTkSuQmCC");
+  --pat-stripesH: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACAQAAAACx+ouKAAAADElEQVR42mNgYGgAAACEAIH3iD0+AAAAAElFTkSuQmCC");
+  --pat-stripesV: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABAQAAAADcWUInAAAACklEQVR42mNwAAAAQgBBhL+OYgAAAABJRU5ErkJggg==");
+
+  /* pixel icons (crisp-edged SVG, 1 unit = 1 screen pixel; scaled with background-size) */
+  --ico-orbit: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'><path d='M6 1h3v1h-3zM5 2h5v3h-5zM6 5h3v1h-3zM2 9h3v1h-3zM1 10h5v3h-5zM2 13h3v1h-3zM10 9h3v1h-3zM9 10h5v3h-5zM10 13h3v1h-3z'/></svg>");
+  --ico-down: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='5' shape-rendering='crispEdges'><path d='M0 0h9v1h-9zM1 1h7v1h-7zM2 2h5v1h-5zM3 3h3v1h-3zM4 4h1v1h-1z'/></svg>");
+  --ico-right: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='5' height='9' shape-rendering='crispEdges'><path d='M0 0h1v9h-1zM1 1h1v7h-1zM2 2h1v5h-1zM3 3h1v3h-1zM4 4h1v1h-1z'/></svg>");
+  --ico-up: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='5' shape-rendering='crispEdges'><path d='M4 0h1v1h-1zM3 1h3v1h-3zM2 2h5v1h-5zM1 3h7v1h-7zM0 4h9v1h-9z'/></svg>");
+  --ico-check: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='11' shape-rendering='crispEdges'><path d='M1 1L10 10M10 1L1 10' stroke='black' stroke-width='1.2'/></svg>");
+  /* slider pointer: white pentagon with a black outline */
+  --ico-thumb: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='13' height='16' shape-rendering='crispEdges'><polygon points='0.5,0.5 12.5,0.5 12.5,9.5 6.5,15.5 0.5,9.5' fill='white' stroke='black'/></svg>");
+}
+
+/* ---------- desktop ---------- */
+html[data-theme^='mac'],
+html[data-theme^='mac'] body {
+  background: var(--paper) var(--pat-gray50) 0 0 / calc(var(--px) * 2) calc(var(--px) * 2);
+  color: #000;
+  font-family: var(--font);
+  font-size: var(--fs);
+  line-height: 1.2;
+  image-rendering: pixelated;
+}
+/* one bitmap face at one size, regular weight: no glow, no tracking, no faux bold */
+html[data-theme^='mac'] * {
+  font-size: var(--fs);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0;
+  text-shadow: none;
+}
+
+/* the rounded black corners of a classic Mac screen (replaces the CRT scanlines) */
+html[data-theme^='mac'] body::after {
+  z-index: 100;
+  mix-blend-mode: normal;
+  background:
+    radial-gradient(circle at 0 0, transparent calc(var(--px) * 7), var(--corner) calc(var(--px) * 8)) 0 0 / calc(var(--px) * 9) calc(var(--px) * 9) no-repeat,
+    radial-gradient(circle at 100% 0, transparent calc(var(--px) * 7), var(--corner) calc(var(--px) * 8)) 100% 0 / calc(var(--px) * 9) calc(var(--px) * 9) no-repeat,
+    radial-gradient(circle at 0 100%, transparent calc(var(--px) * 7), var(--corner) calc(var(--px) * 8)) 0 100% / calc(var(--px) * 9) calc(var(--px) * 9) no-repeat,
+    radial-gradient(circle at 100% 100%, transparent calc(var(--px) * 7), var(--corner) calc(var(--px) * 8)) 100% 100% / calc(var(--px) * 9) calc(var(--px) * 9) no-repeat;
+}
+
+/* ---------- menu bar ---------- */
+html[data-theme^='mac'] #topbar {
+  height: var(--menubar-h);
+  padding: 0 calc(var(--px) * 10);
+  background: #fff;
+  border-bottom: var(--bw) solid #000;
+  color: #000;
+  text-transform: none;
+}
+html[data-theme^='mac'] .brand { gap: calc(var(--px) * 8); align-items: center; }
+html[data-theme^='mac'] .brand-mark {
+  width: calc(var(--px) * 16);
+  height: calc(var(--px) * 16);
+  font-size: 0;
+  background: #000;
+  -webkit-mask: var(--ico-orbit) center / 100% 100% no-repeat;
+          mask: var(--ico-orbit) center / 100% 100% no-repeat;
+}
+html[data-theme^='mac'] .brand-ver { display: none; }
+html[data-theme^='mac'] .topstats { align-items: center; gap: calc(var(--px) * 14); }
+html[data-theme^='mac'] .stat { color: #000; }
+html[data-theme^='mac'] .status {
+  padding: 0 calc(var(--px) * 6);
+  border: 0;
+  color: #000;
+}
+html[data-theme^='mac'] .status.on { background: #000; color: #fff; animation: none; }
+html[data-theme^='mac'] .help-btn {
+  width: calc(var(--px) * 16);
+  height: calc(var(--px) * 16);
+  padding: 0;
+  line-height: 1;
+  color: #000;
+  background: #fff;
+  border: var(--bw) solid #000;
+  border-radius: calc(var(--px) * 3);
+}
+html[data-theme^='mac'] .help-btn:hover { background: #fff; box-shadow: none; }
+html[data-theme^='mac'] .help-btn:active { background: #000; color: #fff; }
+
+/* ---------- windows ---------- */
+html[data-theme^='mac'] body { --win-right: calc(var(--gap) + var(--panel-w) + var(--gap)); }
+html[data-theme^='mac'] body.panel-hidden { --win-right: var(--gap); }
+
+/* title bar shared by the scene window, the control palette and the help popover */
+html[data-theme^='mac'] .win-title,
+html[data-theme^='mac'] .popover-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--title-h);
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 0;
+  border-bottom: var(--bw) solid #000;
+  color: #000;
+  text-transform: none;
+  user-select: none;
+}
+/* the six-line "grip" stripes, with the title sitting on a white patch over them */
+html[data-theme^='mac'] .win-title::before,
+html[data-theme^='mac'] .popover-title::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--px) * 3);
+  right: calc(var(--px) * 3);
+  top: calc(var(--px) * 3);
+  height: calc(var(--px) * 11);
+  color: transparent;
+  /* tile stretched to the full width so there are no seams */
+  background: var(--pat-stripesH) 0 0 / 100% calc(var(--px) * 2) repeat-y;
+}
+html[data-theme^='mac'] .win-title-text { position: relative; padding: 0 calc(var(--px) * 8); background: #fff; }
+
+html[data-theme^='mac'] .close-box {
+  position: absolute;
+  left: calc(var(--px) * 8);
+  top: calc(var(--px) * 2);
+  z-index: 1;
+  width: calc(var(--px) * 13);
+  height: calc(var(--px) * 13);
+  padding: 0;
+  background: #fff;
+  border: var(--bw) solid #000;
+  box-shadow: 0 0 0 var(--bw2) #fff; /* clears the stripes around the box */
+  cursor: pointer;
+}
+html[data-theme^='mac'] .close-box:active { background: #000; }
+
+/* the scene as a document window on the desktop */
+html[data-theme^='mac'] #scene-title {
+  position: fixed;
+  z-index: 1;
+  top: var(--win-top);
+  left: var(--gap);
+  right: var(--win-right);
+  border: var(--bw) solid #000;
+  box-shadow: var(--sh) var(--sh) 0 #000;
+}
+html[data-theme^='mac'] #scene {
+  inset: auto;
+  top: calc(var(--win-top) + var(--title-h) - var(--px)); /* shares the title bar's bottom border */
+  left: var(--gap);
+  right: var(--win-right);
+  bottom: var(--gap);
+  z-index: 2;
+  background: #fff;
+  border: var(--bw) solid #000;
+  box-shadow: var(--sh) var(--sh) 0 #000;
+}
+html[data-theme^='mac'] #scene canvas { image-rendering: pixelated; }
+
+/* the control panel as a floating palette */
+html[data-theme^='mac'] #panel {
+  top: var(--win-top);
+  right: var(--gap);
+  bottom: var(--gap);
+  width: var(--panel-w);
+  max-width: none;
+  background: #fff;
+  border: var(--bw) solid #000;
+  box-shadow: var(--sh) var(--sh) 0 #000;
+  backdrop-filter: none;
+  transition: none;
+}
+html[data-theme^='mac'] body.panel-hidden #panel { display: none; transform: none; }
+html[data-theme^='mac'] #panel-title { flex: 0 0 auto; }
+html[data-theme^='mac'] #panel-body {
+  padding: calc(var(--px) * 10) calc(var(--px) * 6) calc(var(--px) * 14) calc(var(--px) * 10);
+}
+
+/* "Controls" button shown only while the palette is closed */
+html[data-theme^='mac'] #panel-toggle {
+  top: calc(var(--win-top) + var(--title-h) + var(--gap));
+  right: calc(var(--gap) + var(--gap));
+  padding: calc(var(--px) * 3) calc(var(--px) * 9) calc(var(--px) * 4);
+  font-size: 0;
+  line-height: 1.1;
+  color: #000;
+  background: #fff;
+  border: var(--bw) solid #000;
+  border-radius: calc(var(--px) * 6);
+  transition: none;
+}
+html[data-theme^='mac'] #panel-toggle::after { content: 'Controls'; font-size: var(--fs); }
+html[data-theme^='mac'] #panel-toggle:active { background: #000; color: #fff; }
+html[data-theme^='mac'] body:not(.panel-hidden) #panel-toggle { display: none; }
+html[data-theme^='mac'] body.panel-hidden #panel-toggle { right: calc(var(--gap) + var(--gap)); }
+
+/* ---------- scrollbar: the classic arrow-button scrollbar ---------- */
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar { width: calc(var(--px) * 15); background: #fff; }
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar-track {
+  background: var(--pat-gray50) 0 0 / calc(var(--px) * 2) calc(var(--px) * 2);
+  border-left: var(--bw) solid #000;
+}
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar-thumb {
+  background: #fff;
+  border: var(--bw) solid #000;
+}
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar-button:single-button {
+  display: block;
+  width: calc(var(--px) * 15);
+  height: calc(var(--px) * 15);
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: calc(var(--px) * 9) calc(var(--px) * 5);
+  border-left: var(--bw) solid #000;
+}
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image: var(--ico-up);
+  border-bottom: var(--bw) solid #000;
+}
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image: var(--ico-down);
+  border-top: var(--bw) solid #000;
+}
+html[data-theme^='mac'] #panel-body::-webkit-scrollbar-button:single-button:active { background-color: #000; }
+@supports not selector(::-webkit-scrollbar) {
+  html[data-theme^='mac'] #panel-body { scrollbar-color: #000 #fff; }
+}
+
+/* ---------- sections ---------- */
+html[data-theme^='mac'] .section { margin-bottom: calc(var(--px) * 12); }
+html[data-theme^='mac'] .section-title {
+  gap: calc(var(--px) * 6);
+  padding-bottom: calc(var(--px) * 3);
+  margin-bottom: calc(var(--px) * 8);
+  text-transform: none;
+  color: #000;
+  border-bottom: var(--bw) solid #000;
+}
+html[data-theme^='mac'] .section-title:hover { color: #000; }
+html[data-theme^='mac'] .section-arrow {
+  width: calc(var(--px) * 9);
+  height: calc(var(--px) * 9);
+  font-size: 0;
+  background: var(--ico-down) center / calc(var(--px) * 9) calc(var(--px) * 5) no-repeat;
+  transition: none;
+}
+html[data-theme^='mac'] .section.collapsed .section-arrow {
+  transform: none;
+  background-image: var(--ico-right);
+  background-size: calc(var(--px) * 5) calc(var(--px) * 9);
+}
+
+/* ---------- buttons ---------- */
+/* pixel icon before a label (icons.js): 12 screen pixels square, in the button's text colour */
+html[data-theme^='mac'] .ic {
+  width: calc(var(--px) * 12);
+  height: calc(var(--px) * 12);
+  margin-right: calc(var(--px) * 1);
+  vertical-align: calc(var(--px) * -2);
+}
+html[data-theme^='mac'] .btn {
+  padding: calc(var(--px) * 3) calc(var(--px) * 8) calc(var(--px) * 4);
+  line-height: 1.1;
+  text-transform: none;
+  color: #000;
+  background: #fff;
+  border: var(--bw) solid #000;
+  border-radius: calc(var(--px) * 6);
+  box-shadow: none;
+  transition: none;
+}
+html[data-theme^='mac'] .btn:hover { background: #fff; box-shadow: none; }
+html[data-theme^='mac'] .btn:active,
+html[data-theme^='mac'] .btn.active { color: #fff; background: #000; transform: none; box-shadow: none; }
+/* the "default button": heavy outer ring */
+html[data-theme^='mac'] .btn-primary { margin: calc(var(--px) * 4); }
+html[data-theme^='mac'] .btn-primary,
+html[data-theme^='mac'] .btn-primary:hover,
+html[data-theme^='mac'] .btn-primary:active {
+  box-shadow: 0 0 0 calc(var(--px) * 2) #fff, 0 0 0 calc(var(--px) * 4) #000;
+}
+html[data-theme^='mac'] .btn:focus-visible { outline: var(--bw) dotted #000; outline-offset: calc(var(--px) * 2); }
+html[data-theme^='mac'] .btn-row,
+html[data-theme^='mac'] .btn-grid { gap: calc(var(--px) * 6); }
+html[data-theme^='mac'] .btn-grid.three { gap: calc(var(--px) * 6); }
+
+/* ---------- sliders ---------- */
+html[data-theme^='mac'] .slider { margin: calc(var(--px) * 7) 0; }
+html[data-theme^='mac'] .slider-label { margin-bottom: calc(var(--px) * 3); text-transform: none; }
+html[data-theme^='mac'] .slider-val { color: #000; }
+html[data-theme^='mac'] input[type='range'] {
+  display: block;
+  height: calc(var(--px) * 20);
+  background: transparent;
+  cursor: default;
+}
+/* groove + tick marks; the pointer sits above the groove */
+html[data-theme^='mac'] input[type='range']::-webkit-slider-runnable-track {
+  height: calc(var(--px) * 20);
+  background:
+    linear-gradient(#000, #000) 0 calc(var(--px) * 15) / 100% calc(var(--px) * 2) no-repeat,
+    repeating-linear-gradient(90deg, #000 0 var(--px), transparent var(--px) calc(var(--px) * 12)) 0 calc(var(--px) * 17) / 100% calc(var(--px) * 3) no-repeat;
+}
+html[data-theme^='mac'] input[type='range']::-moz-range-track {
+  height: calc(var(--px) * 20);
+  background:
+    linear-gradient(#000, #000) 0 calc(var(--px) * 15) / 100% calc(var(--px) * 2) no-repeat,
+    repeating-linear-gradient(90deg, #000 0 var(--px), transparent var(--px) calc(var(--px) * 12)) 0 calc(var(--px) * 17) / 100% calc(var(--px) * 3) no-repeat;
+}
+html[data-theme^='mac'] input[type='range']::-webkit-slider-thumb {
+  width: calc(var(--px) * 13);
+  height: calc(var(--px) * 16);
+  margin-top: 0;
+  background: var(--ico-thumb) center / 100% 100% no-repeat;
+  box-shadow: none;
+  border: 0;
+}
+html[data-theme^='mac'] input[type='range']::-moz-range-thumb {
+  width: calc(var(--px) * 13);
+  height: calc(var(--px) * 16);
+  background: var(--ico-thumb) center / 100% 100% no-repeat;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---------- checkboxes ---------- */
+html[data-theme^='mac'] .tgl { gap: calc(var(--px) * 6); text-transform: none; }
+html[data-theme^='mac'] .tgl-grid { gap: calc(var(--px) * 8) calc(var(--px) * 8); }
+html[data-theme^='mac'] .tgl-box {
+  width: calc(var(--px) * 13);
+  height: calc(var(--px) * 13);
+  background: #fff;
+  border: var(--bw) solid #000;
+}
+html[data-theme^='mac'] .tgl input:checked + .tgl-box {
+  background: #fff var(--ico-check) center / calc(var(--px) * 11) calc(var(--px) * 11) no-repeat;
+  box-shadow: none;
+}
+
+/* ---------- group boxes, readouts ---------- */
+html[data-theme^='mac'] .custom-body {
+  padding: calc(var(--px) * 6) calc(var(--px) * 9);
+  border: var(--bw) solid #000;
+  border-radius: calc(var(--px) * 4);
+}
+html[data-theme^='mac'] .custom-body-title { gap: calc(var(--px) * 8); text-transform: none; }
+html[data-theme^='mac'] .swatch {
+  width: calc(var(--px) * 12);
+  height: calc(var(--px) * 12);
+  border: var(--bw) solid #000;
+  box-shadow: none;
+}
+html[data-theme^='mac'] .editor-hint,
+html[data-theme^='mac'] .io-name-label { color: #000; text-transform: none; }
+
+html[data-theme^='mac'] .ro-grid { gap: calc(var(--px) * 3) calc(var(--px) * 12); }
+html[data-theme^='mac'] .ro-label { text-transform: none; }
+html[data-theme^='mac'] .ro-sub { margin: calc(var(--px) * 9) 0 calc(var(--px) * 5); color: #000; text-transform: none; text-decoration: underline; }
+html[data-theme^='mac'] .caps { text-transform: capitalize; }
+/* warnings and severity: no colour, so use inverse video and underline */
+html[data-theme^='mac'] .ro-val.warn,
+html[data-theme^='mac'] .ro-val[data-sev='catastrophic'] { justify-self: end; padding: 0 calc(var(--px) * 5); color: #fff; background: #000; }
+html[data-theme^='mac'] .ro-val[data-sev='disruption'] { text-decoration: underline; }
+
+html[data-theme^='mac'] .bar-row { gap: calc(var(--px) * 8); }
+html[data-theme^='mac'] .bar-track { height: calc(var(--px) * 11); background: #fff; border: var(--bw) solid #000; }
+html[data-theme^='mac'] .bar-fill { box-shadow: none; transition: none; }
+/* bodies A / B / C told apart by fill pattern instead of colour */
+html[data-theme^='mac'] .bar-fill[data-body='0'],
+html[data-theme^='mac'] .swatch[data-body='0'] { background: #000 !important; }
+html[data-theme^='mac'] .bar-fill[data-body='1'],
+html[data-theme^='mac'] .swatch[data-body='1'] {
+  background: #fff var(--pat-gray50) 0 0 / calc(var(--px) * 2) calc(var(--px) * 2) !important;
+}
+html[data-theme^='mac'] .bar-fill[data-body='2'],
+html[data-theme^='mac'] .swatch[data-body='2'] {
+  background: #fff var(--pat-stripesV) 0 0 / calc(var(--px) * 2) 100% repeat-x !important;
+}
+
+/* ---------- text field + status ---------- */
+html[data-theme^='mac'] .io-name {
+  padding: calc(var(--px) * 3) calc(var(--px) * 5);
+  line-height: 1.2;
+  color: #000;
+  background: #fff;
+  border: var(--bw) solid #000;
+  border-radius: 0;
+}
+html[data-theme^='mac'] .io-name:focus { border-color: #000; box-shadow: 0 0 0 var(--bw) #000; }
+html[data-theme^='mac'] .io-name::selection { background: #000; color: #fff; }
+html[data-theme^='mac'] .io-status { color: #000; }
+html[data-theme^='mac'] .io-status.error { display: inline-block; padding: calc(var(--px) * 1) calc(var(--px) * 5); color: #fff; background: #000; }
+
+/* ---------- help popover: a small dialog window ---------- */
+html[data-theme^='mac'] .popover {
+  top: calc(var(--menubar-h) + var(--px) * 6);
+  right: var(--gap);
+  width: calc(var(--px) * 270);
+  padding: 0;
+  background: #fff;
+  border: var(--bw) solid #000;
+  box-shadow:
+    inset 0 0 0 var(--bw2) #fff,
+    inset 0 0 0 calc(var(--px) * 3 + 0.02px) #000,
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 #000;
+  backdrop-filter: none;
+}
+html[data-theme^='mac'] .popover-title { margin: calc(var(--px) * 3) calc(var(--px) * 3) 0; height: calc(var(--title-h) - var(--px) * 3); }
+html[data-theme^='mac'] .popover-title::before { top: calc(var(--px) * 2); left: calc(var(--px) * 2); right: calc(var(--px) * 2); }
+html[data-theme^='mac'] .popover-grid {
+  padding: calc(var(--px) * 9) calc(var(--px) * 12) calc(var(--px) * 12);
+  gap: calc(var(--px) * 5) calc(var(--px) * 12);
+  text-transform: none;
+}
+html[data-theme^='mac'] .popover-grid > span.k {
+  padding: 0 calc(var(--px) * 5);
+  color: #000;
+  background: #fff;
+  border: var(--bw) solid #000;
+  border-radius: calc(var(--px) * 3);
+  box-shadow: var(--px) var(--px) 0 #000;
+}
+
+/* ---------- tooltips: Balloon Help ---------- */
+html[data-theme^='mac'] .tip {
+  max-width: calc(var(--px) * 230);
+  padding: calc(var(--px) * 6) calc(var(--px) * 10);
+  line-height: 1.2;
+  color: #000;
+  background: #fff;
+  border: var(--bw2) solid #000;
+  border-radius: calc(var(--px) * 10);
+  box-shadow: var(--sh) var(--sh) 0 #000;
+}
+html[data-theme^='mac'] .tip::after {
+  content: '';
+  position: absolute;
+  width: calc(var(--px) * 10);
+  height: calc(var(--px) * 10);
+  background: #fff;
+  border: var(--bw2) solid #000;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(45deg);
+}
+html[data-theme^='mac'] .tip[data-side='left']::after { right: calc(var(--px) * -8); top: calc(50% - var(--px) * 6); }
+html[data-theme^='mac'] .tip[data-side='below']::after {
+  left: calc(var(--px) * 16);
+  top: calc(var(--px) * -8);
+  border-left-color: #000; border-top-color: #000;
+  border-right-color: transparent; border-bottom-color: transparent;
+}
+
+/* ---------- narrow screens: palette overlays the scene window ---------- */
+@media (max-width: 760px) {
+  html[data-theme^='mac'] body { --win-right: var(--gap); }
+  html[data-theme^='mac'] #panel { z-index: 12; width: min(var(--panel-w), calc(100vw - 2 * var(--gap))); }
+}
+
+/* ---------- camera section ---------- */
+html[data-theme^='mac'] .cam-row,
+html[data-theme^='mac'] .cam-spot { margin-top: calc(var(--px) * 6); }
+html[data-theme^='mac'] .cam-hint {
+  margin: calc(var(--px) * 9) 0 calc(var(--px) * 10);
+  color: #000;
+  text-transform: none;
+  line-height: 1.25;
+}
+
+/* ---------- dark: inverse video ----------
+ * The whole page is drawn exactly as in the light style and then inverted. For a pure
+ * black/white bitmap that is exact (no greys to go wrong), and the canvas's dithered frame
+ * inverts with everything else, so the 3D scene needs no separate dark variant. */
+html[data-theme='mac-dark'] {
+  filter: invert(1);
+  --corner: #fff; /* inverts back to a black screen bezel */
+}

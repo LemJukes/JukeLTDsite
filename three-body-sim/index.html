@@ -4,12 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Three-Body Simulator</title>
-  <meta name="description" content="An interactive three-body gravity simulator with real N-body physics and a CRT terminal aesthetic." />
+  <meta name="description" content="An interactive three-body gravity simulator with real N-body physics and selectable UI styles: a CRT terminal or a classic black-and-white Macintosh desktop." />
+
+  <!-- Apply the saved UI style (and the screen-pixel unit) before first paint so there is no
+       flash of the wrong style or size. Keep in sync with src/themes.js: the storage key, and
+       pixelUnit(). (?theme=<id> in the URL overrides the saved style.) -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var dpr = window.devicePixelRatio || 1;
+      root.style.setProperty('--px', (Math.max(1, Math.round(dpr)) / dpr) + 'px');
+      try {
+        var t = new URLSearchParams(location.search).get('theme') ||
+                localStorage.getItem('three-body-sim:ui-style');
+        if (t && /^[a-z0-9-]+$/.test(t)) root.setAttribute('data-theme', t);
+      } catch (e) { /* storage blocked: fall back to the default style */ }
+    })();
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="themes/mac.css" />
 
   <!-- Buildless modern Three.js via import map (no install / no bundler). -->
   <script type="importmap">
@@ -24,17 +41,28 @@
 <body>
   <div id="scene"></div>
 
+  <!-- window title bar for styles that frame the scene as a window (hidden in the CRT style) -->
+  <div id="scene-title" class="win-title" aria-hidden="true"><span class="win-title-text" id="scene-title-text">Default</span></div>
+
   <header id="topbar"></header>
 
-  <aside id="panel" aria-label="simulator controls"></aside>
+  <aside id="panel" aria-label="simulator controls">
+    <!-- window title bar + close box (hidden in the CRT style) -->
+    <div id="panel-title" class="win-title">
+      <button id="panel-close" class="close-box" type="button" title="close controls" aria-label="close controls"></button>
+      <span class="win-title-text">Controls</span>
+    </div>
+    <div id="panel-body"></div>
+  </aside>
 
   <button id="panel-toggle" type="button" title="toggle controls" aria-label="toggle controls">CTRL</button>
 
   <script type="module" src="src/main.js"></script>
   <script>
     // panel show/hide (small screens or distraction-free viewing)
-    const pt = document.getElementById('panel-toggle');
-    pt.addEventListener('click', () => document.body.classList.toggle('panel-hidden'));
+    const togglePanel = () => document.body.classList.toggle('panel-hidden');
+    document.getElementById('panel-toggle').addEventListener('click', togglePanel);
+    document.getElementById('panel-close').addEventListener('click', togglePanel);
   </script>
 </body>
 </html>

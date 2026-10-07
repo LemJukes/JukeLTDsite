@@ -37,13 +37,31 @@ function glowTexture() {
 }
 
 export class ImpactFX {
-  constructor(parentScene) {
+  /** @param theme scene half of a UI style (see themes.js): `additive` and `ink` matter here */
+  constructor(parentScene, theme) {
     this.group = new THREE.Group();
     parentScene.add(this.group);
     this._tex = glowTexture();
     this._clock = new THREE.Clock();
     this._slots = [];
+    this.setTheme(theme);
     for (let i = 0; i < POOL; i++) this._slots.push(this._makeSlot());
+  }
+
+  /**
+   * Light-emitting styles blend additively and tint each burst from the bodies'
+   * colours; ink styles (`theme.ink` set) draw every burst in that one colour
+   * with ordinary alpha blending, since additive light vanishes on a white page.
+   */
+  setTheme(theme) {
+    this.ink = theme.ink ?? null;
+    this.blending = theme.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    for (const slot of this._slots) {
+      for (const part of [slot.shell, slot.flash, slot.points]) {
+        part.material.blending = this.blending;
+        part.material.needsUpdate = true;
+      }
+    }
   }
 
   _makeSlot() {
@@ -51,20 +69,20 @@ export class ImpactFX {
       new THREE.IcosahedronGeometry(1, 2),
       new THREE.MeshBasicMaterial({
         wireframe: true, transparent: true,
-        blending: THREE.AdditiveBlending, depthWrite: false,
+        blending: this.blending, depthWrite: false,
       })
     );
 
     const flash = new THREE.Sprite(new THREE.SpriteMaterial({
       map: this._tex, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      blending: this.blending, depthWrite: false,
     }));
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PARTICLES * 3), 3));
     const points = new THREE.Points(geo, new THREE.PointsMaterial({
       map: this._tex, size: 1.2, sizeAttenuation: true, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      blending: this.blending, depthWrite: false,
     }));
     points.frustumCulled = false;
 
@@ -80,13 +98,15 @@ export class ImpactFX {
   spawn(point, { severity = 0, color } = {}) {
     const slot = this._slots.find((s) => !s.active) || this._slots[0];
     const scale = 1 + Math.cbrt(Math.max(0, Math.min(severity, 50))); // ~1 .. 4.7
-    const col = color instanceof THREE.Color ? color : new THREE.Color(color ?? 0xffffff);
+    const inked = this.ink != null;
+    const col = inked ? new THREE.Color(this.ink)
+      : color instanceof THREE.Color ? color : new THREE.Color(color ?? 0xffffff);
 
     slot.active = true;
     slot.maxLife = 0.7 + 0.25 * Math.min(scale, 4);
     slot.life = slot.maxLife;
     slot.shellR = 3 * scale;
-    slot.flashR = 6 * scale;
+    slot.flashR = (inked ? 4 : 6) * scale; // a black flash blots out more than a light one
 
     slot.shell.position.copy(point);
     slot.shell.scale.setScalar(0.01);
@@ -96,7 +116,8 @@ export class ImpactFX {
 
     slot.flash.position.copy(point);
     slot.flash.scale.setScalar(slot.flashR * 0.4);
-    slot.flash.material.color.copy(col).lerp(WHITE, 0.5);
+    slot.flash.material.color.copy(col);
+    if (!inked) slot.flash.material.color.lerp(WHITE, 0.5);
     slot.flash.material.opacity = 1;
     slot.flash.visible = true;
 

@@ -1,4 +1,12 @@
-/* styles.css — 1980s CRT terminal aesthetic for the three-body simulator. */
+/* styles.css — structure + the default 1980s CRT terminal look for the three-body simulator.
+ *
+ * UI styles: the active style is html[data-theme='<id>'] (set from src/themes.js). This file is
+ * the default (crt) style and the shared layout; every other style lives in themes/<id>.css and
+ * overrides it with selectors scoped to html[data-theme='<id>'].
+ *
+ * Label text in the markup is written in Title Case; this style upper-cases it with
+ * text-transform so other styles can show it as written.
+ */
 
 :root {
   --green: #4dff88;
@@ -13,7 +21,15 @@
   --glow: 0 0 6px rgba(77, 255, 136, 0.55);
   --mono: 'Share Tech Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   --display: 'VT323', var(--mono);
+
+  /* collision impact severity, calm to alarming */
+  --sev-merge: #4dff88;
+  --sev-disruption: #ffc24d;
+  --sev-catastrophic: #ff6b6b;
 }
+
+/* window chrome used only by windowed styles (see themes/mac.css) */
+.win-title { display: none; }
 
 * { box-sizing: border-box; }
 
@@ -101,8 +117,8 @@ body::after {
   z-index: 10;
   width: 320px;
   max-width: 88vw;
-  padding: 14px 16px 28px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--panel-bg);
   border-left: 1px solid var(--line);
   backdrop-filter: blur(2px);
@@ -110,8 +126,14 @@ body::after {
 }
 body.panel-hidden #panel { transform: translateX(100%); }
 
-#panel::-webkit-scrollbar { width: 8px; }
-#panel::-webkit-scrollbar-thumb { background: var(--line); }
+#panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px 28px;
+  overflow-y: auto;
+}
+#panel-body::-webkit-scrollbar { width: 8px; }
+#panel-body::-webkit-scrollbar-thumb { background: var(--line); }
 
 .section { margin-bottom: 18px; }
 .section-title {
@@ -120,6 +142,7 @@ body.panel-hidden #panel { transform: translateX(100%); }
   gap: 6px;
   font-size: 13px;
   letter-spacing: 3px;
+  text-transform: uppercase;
   color: var(--green-dim);
   border-bottom: 1px dashed var(--line-soft);
   padding-bottom: 4px;
@@ -164,6 +187,28 @@ body.panel-hidden #panel { transform: translateX(100%); }
 }
 .btn-primary { color: var(--amber); border-color: var(--amber); }
 .btn-primary:hover { background: rgba(255, 194, 77, 0.16); box-shadow: 0 0 6px rgba(255, 194, 77, 0.55); }
+/* the first button of a two-column grid takes the full row (the rest pair up beneath it) */
+.btn-grid.span-first > :first-child { grid-column: 1 / -1; }
+
+/* pixel icon in front of a button label (see icons.js); takes the button's text colour */
+.ic { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px; }
+.ic .icon { display: block; width: 100%; height: 100%; }
+
+/* camera section: sub-option rows that only apply to some focus choices, and the hint line */
+.cam-opts.hidden, .cam-spot.hidden { display: none; }
+.cam-spot { margin-top: 6px; }
+.cam-spot .btn { width: 100%; }
+.cam-row { margin-top: 6px; }
+.cam-opts .ro-sub { margin-top: 12px; }
+.cam-hint {
+  margin: 10px 0 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--green-dim);
+}
+.ro-sub.first { margin-top: 0; }
 
 /* sliders */
 .slider { display: block; margin: 9px 0; }
@@ -239,6 +284,7 @@ input[type='range']::-moz-range-thumb {
   font-size: 13px; letter-spacing: 2px; color: var(--amber);
   margin-bottom: 6px;
 }
+.custom-body-title { text-transform: uppercase; }
 .swatch { width: 10px; height: 10px; box-shadow: 0 0 6px currentColor; display: inline-block; }
 .custom-body .slider { margin: 5px 0; }
 
@@ -292,6 +338,10 @@ input[type='range']::-moz-range-thumb {
 .ro-label { color: var(--green-dim); text-transform: uppercase; letter-spacing: 1px; }
 .ro-val { color: var(--cyan); text-align: right; }
 .ro-val.warn { color: #ff5d5d; text-shadow: 0 0 6px rgba(255, 93, 93, 0.5); }
+.caps { text-transform: uppercase; }
+.ro-val[data-sev='merge'] { color: var(--sev-merge); }
+.ro-val[data-sev='disruption'] { color: var(--sev-disruption); }
+.ro-val[data-sev='catastrophic'] { color: var(--sev-catastrophic); }
 .ro-sub { font-size: 11px; color: var(--green-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
 .bars { display: flex; flex-direction: column; gap: 5px; }
 .bar-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
@@ -337,6 +387,7 @@ input[type='range']::-moz-range-thumb {
 }
 .popover.hidden { display: none; }
 .popover-title {
+  text-transform: uppercase;
   font-size: 13px; letter-spacing: 3px; color: var(--green-dim);
   border-bottom: 1px dashed var(--line-soft); padding-bottom: 5px; margin-bottom: 8px;
 }

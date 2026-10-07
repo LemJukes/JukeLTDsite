@@ -1,9 +1,10 @@
 // scene.js — all the Three.js rendering for the simulator.
 //
 // Owns the renderer, camera, orbit controls, the per-body visuals (low-poly
-// wireframe sphere + fading trail + optional velocity arrow), the centre-of-mass
-// crosshair, the "infinite" backdrop grid, body picking/selection, and a subtle
-// bloom pass. It reads state from an NBodySystem each frame but never mutates it.
+// wireframe sphere spinning on its own axis + fading trail + optional velocity
+// arrow), the centre-of-mass crosshair, the "infinite" backdrop grid, the star
+// field, body picking/selection, and the post-processing (bloom / 1-bit dither).
+// It reads state from an NBodySystem each frame but never mutates it.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -11,28 +12,89 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { ImpactFX } from './effects.js';
+import { pixelUnit } from './themes.js';
 
 const GRID_CELL = 10;
 const TRAIL_CAPACITY = 4000; // max points buffered per trail
-const COM_COLOR = 0x5b8cff;
-const SELECT_COLOR = 0xffffff;
+const BASE_FOV = 60;
+const SURFACE_FOV = 90;      // wide lens when standing on a body (vertical degrees)
+const SURFACE_EYE = 1.03;    // camera height as a multiple of the body's radius (just above its surface)
+const SURFACE_NEAR = 0.02;   // near plane close enough for the ground right under the camera
+const SURFACE_MAX_PITCH = THREE.MathUtils.degToRad(89.5); // straight up / down, short of the pole
+const GRID_LADDER = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]; // grid cell multipliers (see _updateGrid)
+const STAR_RADIUS = 10000;   // star sphere, re-centred on the camera every frame so it sits at infinity
+const STAR_TIERS = [         // faint field + a few bright stars; size in CSS px (screen px for pixel styles)
+  { count: 1400, size: 1 },
+  { count: 160, size: 2 },
+];
+
+// Small deterministic PRNG so the sky is the same on every load.
+function mulberry32(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Each body spins steadily about its own tilted axis (purely cosmetic; it keeps turning while
+// the sim is paused). Axis and rate vary per body so they don't spin in lock-step.
+function spinFor(i) {
+  const tilt = 0.25 + 0.3 * ((i * 0.618) % 1);    // radians off the orbital-plane normal (+z)
+  const azimuth = i * 2.39996;                     // golden angle, spreads the tilts around
+  const axis = new THREE.Vector3(Math.sin(tilt) * Math.cos(azimuth), Math.sin(tilt) * Math.sin(azimuth), Math.cos(tilt));
+  const rate = 0.32 + 0.22 * ((i * 0.381) % 1);   // radians per second
+  return { axis: axis.normalize(), rate };
+}
+
+// Final 1-bit pass for monochrome styles: ordered (Bayer 4x4) dither of the
+// finished frame to pure black/white, so mid-greys (the faint grid, fading
+// trails, translucent bursts) become the stippled patterns of an early Mac
+// bitmap display instead of smooth shades. `cell` is the size of one dither
+// pixel in render-target pixels.
+const DitherShader = {
+  uniforms: { tDiffuse: { value: null }, cell: { value: 1 } },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform float cell;
+    varying vec2 vUv;
+    float bayer2(vec2 a) { a = floor(a); return fract(a.x * 0.5 + a.y * a.y * 0.75); }
+    float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+    void main() {
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      float t = bayer4(floor(gl_FragCoord.xy / cell));
+      gl_FragColor = vec4(vec3(l > t ? 1.0 : 0.0), 1.0);
+    }`,
+};
 
 export class SimScene {
-  constructor(container) {
+  /** @param theme scene half of a UI style — see themes.js */
+  constructor(container, theme) {
     this.container = container;
+    this.theme = theme;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this._pixelRatioFor(theme));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x02040a);
+    this.scene.background = new THREE.Color(theme.background);
+    this._fade = new THREE.Color(theme.fadeTo);
 
-    this.camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 50000);
+    this.camera = new THREE.PerspectiveCamera(BASE_FOV, container.clientWidth / container.clientHeight, 0.1, 50000);
     this.camera.position.set(0, 0, 60);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -54,9 +116,10 @@ export class SimScene {
     this.arrows = [];
 
     this._buildComposer();
+    this._buildStars();
 
     // collision pyrotechnics (cosmetic; reads nothing back into the physics)
-    this.fx = new ImpactFX(this.scene);
+    this.fx = new ImpactFX(this.scene, theme);
 
     // option state mirrored by the UI
     this.options = {
@@ -65,24 +128,56 @@ export class SimScene {
       showTrails: true,
       showVectors: false,
       showZLines: true,
-      followCOM: false,
-      trackCOM: false,
+      showStars: true,
     };
+    this._spinClock = new THREE.Clock(); // drives the bodies' cosmetic spin, paused or not
 
     this._com = new THREE.Vector3();
-    this._comPrev = new THREE.Vector3(); // COM last frame, for tracking deltas
-    this._tracking = false;              // whether a tracking lock is active
     this._tmp = new THREE.Vector3();
+    this._tmp2 = new THREE.Vector3();
     this._proj = new THREE.Vector3();
+
+    // camera focus (see setCamera)
+    this.cam = { focus: 'free', view: 'orbit' };
+    this.onCameraChange = null;            // called when the scene changes the camera itself
+    this._camSettle = 0;                   // frames of soft re-centring after a focus change
+    this._savedPose = null;                // orbit pose to restore when leaving the surface view
+    this._spot = new THREE.Vector3(0, 0, 1);     // random surface point, as a raw direction
+    // The standing frame, stored in the body's own (spinning) coordinates so it turns with it:
+    // n = local "up" (away from the body's centre), e1 = horizontal axis at yaw 0, e2 = n x e1.
+    this._surfaceNL = new THREE.Vector3(0, 0, 1);
+    this._surfaceE1L = new THREE.Vector3(1, 0, 0);
+    this._surfaceE2L = new THREE.Vector3(0, 1, 0);
+    // ...and the same three in world space for the current frame
+    this._surfaceN = new THREE.Vector3();
+    this._surfaceE1 = new THREE.Vector3();
+    this._surfaceE2 = new THREE.Vector3();
+    this._yaw = 0;                                // look direction within that frame
+    this._pitch = SURFACE_MAX_PITCH;              //   (starts straight up, away from the body)
+    this._qInv = new THREE.Quaternion();
+    this._surfaceInit = false;
+    this._gridLevel = 0;                          // index into GRID_LADDER
+    this._bindSurfaceLook();
+  }
+
+  _pixelRatioFor(theme) {
+    if (theme.pixelRatio === 'unit') return 1 / pixelUnit().css; // one buffer pixel = one screen pixel
+    return theme.pixelRatio ?? Math.min(window.devicePixelRatio, 2);
   }
 
   _buildGrid() {
-    this.grid = new THREE.GridHelper(2000, 2000 / GRID_CELL, 0x0c4a2a, 0x0a3a22);
+    if (this.grid) {
+      this.scene.remove(this.grid);
+      this.grid.geometry.dispose();
+      this.grid.material.dispose();
+    }
+    const [c1, c2] = this.theme.grid;
+    this.grid = new THREE.GridHelper(2000, 2000 / GRID_CELL, c1, c2);
     // GridHelper lies in the xz plane by default; rotate it into the xy plane so
     // it sits behind the (planar) orbits, matching the original "backdrop" idea.
     this.grid.rotation.x = Math.PI / 2;
-    this.grid.material.transparent = true;
-    this.grid.material.opacity = 0.4;
+    this.grid.material.transparent = this.theme.gridOpacity < 1;
+    this.grid.material.opacity = this.theme.gridOpacity;
     this.grid.material.depthWrite = false;
     this.scene.add(this.grid);
   }
@@ -98,12 +193,12 @@ export class SimScene {
       0, -L, 0, 0, L, 0,
       0, 0, -L, 0, 0, L,
     ], 3));
-    const lineMat = new THREE.LineBasicMaterial({ color: COM_COLOR, transparent: true, opacity: 0.9 });
+    const lineMat = new THREE.LineBasicMaterial({ color: this.theme.com, transparent: true, opacity: this.theme.comOpacity });
     const crosshair = new THREE.LineSegments(axes, lineMat);
 
     const cube = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1.6, 1.6, 1.6)),
-      new THREE.LineBasicMaterial({ color: COM_COLOR })
+      new THREE.LineBasicMaterial({ color: this.theme.com })
     );
 
     this.comGroup.add(crosshair, cube);
@@ -114,10 +209,56 @@ export class SimScene {
   _buildSelection() {
     this.selectionBox = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
-      new THREE.LineBasicMaterial({ color: SELECT_COLOR, transparent: true, opacity: 0.85 })
+      new THREE.LineBasicMaterial({ color: this.theme.select, transparent: true, opacity: this.theme.selectOpacity })
     );
     this.selectionBox.visible = false;
     this.scene.add(this.selectionBox);
+  }
+
+  // Background star field: points scattered over a big sphere that is re-centred on the camera
+  // every frame, so the stars sit "at infinity" and only turn, never shift, as the view moves.
+  // It gives the eye a fixed reference when nothing else is in view (e.g. riding a spinning
+  // body). Two tiers: a faint field and a few brighter stars.
+  _buildStars() {
+    const rand = mulberry32(0x3b0d1e5);
+    this.stars = new THREE.Group();
+    this.starTiers = STAR_TIERS.map(({ count, size }) => {
+      const pos = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const u = rand() * 2 - 1;
+        const a = rand() * Math.PI * 2;
+        const r = Math.sqrt(1 - u * u);
+        pos[i * 3] = r * Math.cos(a) * STAR_RADIUS;
+        pos[i * 3 + 1] = r * Math.sin(a) * STAR_RADIUS;
+        pos[i * 3 + 2] = u * STAR_RADIUS;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const points = new THREE.Points(geo, new THREE.PointsMaterial({ sizeAttenuation: false, depthWrite: false }));
+      points.frustumCulled = false;
+      points.renderOrder = -1; // behind everything
+      this.stars.add(points);
+      return { points, count, size };
+    });
+    this.scene.add(this.stars);
+    this._styleStars();
+  }
+
+  // Star colour, density, blending and size for the current style and resolution. Sizes are
+  // whole render pixels so a star never straddles two pixels and flickers as the view turns.
+  _styleStars() {
+    const t = this.theme;
+    const pr = this.renderer.getPixelRatio();
+    const toBuffer = t.pixelRatio === 'unit' ? 1 : pr; // pixel styles size stars in screen pixels
+    this.starTiers.forEach((tier, i) => {
+      const m = tier.points.material;
+      m.color.set(t.starColors[i]);
+      m.size = Math.max(1, Math.round(tier.size * toBuffer)) / pr; // three.js multiplies by pr again
+      m.blending = t.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+      m.transparent = t.additive;
+      m.needsUpdate = true;
+      tier.points.geometry.setDrawRange(0, Math.round(tier.count * t.starDensity));
+    });
   }
 
   _buildComposer() {
@@ -129,10 +270,58 @@ export class SimScene {
 
     // subtle glow only — enough to feel like a phosphor/vector display without
     // washing out the crisp wireframes
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.35, 0.3, 0.12);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), this.theme.bloom, 0.3, 0.12);
+    this.bloomPass.enabled = this.theme.bloom > 0;
     this.composer.addPass(this.bloomPass);
 
     this.composer.addPass(new OutputPass());
+
+    // 1-bit finish for monochrome styles (disabled passes are skipped, so the
+    // OutputPass renders straight to screen when this is off)
+    this.ditherPass = new ShaderPass(DitherShader);
+    this.ditherPass.enabled = !!this.theme.dither;
+    this.composer.addPass(this.ditherPass);
+  }
+
+  // ---- UI style ----
+
+  /** Restyle the whole scene for a UI style (the `scene` half of a themes.js entry). */
+  setTheme(theme) {
+    this.theme = theme;
+    this.scene.background.set(theme.background);
+    this._fade.set(theme.fadeTo);
+
+    this.resize(); // also re-derives the renderer resolution for this style
+
+    this.bloomPass.strength = theme.bloom;
+    this.bloomPass.enabled = theme.bloom > 0;
+    this.ditherPass.enabled = !!theme.dither;
+    this._styleStars();
+
+    this._buildGrid();
+    for (const m of this.comGroup.children) m.material.color.set(theme.com);
+    this.comGroup.children[0].material.opacity = theme.comOpacity; // the crosshair (the cube is opaque)
+    this.selectionBox.material.color.set(theme.select);
+    this.selectionBox.material.opacity = theme.selectOpacity;
+
+    this.fx.setTheme(theme);
+    for (const v of this.bodyVisuals) this._styleVisual(v);
+  }
+
+  _inkFor(body) {
+    return new THREE.Color(this.theme.ink ?? body.color);
+  }
+
+  // (Re)apply the current style's colours and blending to one body's meshes.
+  _styleVisual(v) {
+    v.color = this._inkFor(v.body);
+    const hex = v.color.getHex();
+    v.mesh.material.color.copy(v.color);
+    v.trail.material.blending = this.theme.additive ? THREE.AdditiveBlending : THREE.MultiplyBlending;
+    v.trail.material.needsUpdate = true;
+    v.zline.material.color.copy(v.color);
+    v.zline.material.opacity = this.theme.zOpacity;
+    v.arrow.setColor(hex);
   }
 
   // ---- collision effects ----
@@ -156,8 +345,8 @@ export class SimScene {
     this.fx.clear();
     this.setSelected(-1);
 
-    for (const body of system.bodies) {
-      const color = new THREE.Color(body.color);
+    for (const [i, body] of system.bodies.entries()) {
+      const color = this._inkFor(body);
 
       // low-poly icosahedron (detail 1) for an early-CG wireframe look; unit
       // geometry scaled per-frame from body.radius so live size edits are free
@@ -167,8 +356,9 @@ export class SimScene {
       );
       mesh.scale.setScalar(body.radius);
 
-      // trail: fixed-capacity buffer, drawn as an additive line that fades to
-      // black at the tail (on a black background that reads as a fade-out).
+      // trail: fixed-capacity buffer, drawn as a line whose vertex colour fades
+      // from the body's ink at the head to the background colour at the tail
+      // (additive on dark styles, multiply on light ones — see _styleVisual).
       const positions = new Float32Array(TRAIL_CAPACITY * 3);
       const colors = new Float32Array(TRAIL_CAPACITY * 3);
       const geo = new THREE.BufferGeometry();
@@ -180,7 +370,6 @@ export class SimScene {
         new THREE.LineBasicMaterial({
           vertexColors: true,
           transparent: true,
-          blending: THREE.AdditiveBlending,
           depthWrite: false,
         })
       );
@@ -199,7 +388,6 @@ export class SimScene {
         new THREE.LineDashedMaterial({
           color: color.getHex(),
           transparent: true,
-          opacity: 0.5,
           dashSize: 1.4,
           gapSize: 1,
           depthWrite: false,
@@ -208,10 +396,17 @@ export class SimScene {
       zline.frustumCulled = false;
 
       this.scene.add(mesh, trail, zline);
-      this.bodyVisuals.push({ body, mesh, trail, zline, color, points: [] });
+      const { axis: spinAxis, rate: spinRate } = spinFor(i);
+      const visual = { body, mesh, trail, zline, arrow, color, points: [], spinAxis, spinRate, spin: 0 };
+      this._styleVisual(visual);
+      this.bodyVisuals.push(visual);
     }
 
     this.arrowGroup.visible = this.options.showVectors;
+
+    // a new system invalidates the surface seat and the chase offset: re-seat / re-centre
+    if (this.cam.view === 'surface') this._surfaceInit = true;
+    this._camSettle = 40;
   }
 
   _disposeVisual(v) {
@@ -295,19 +490,26 @@ export class SimScene {
 
   /** Push current physics state into the meshes, trails, COM marker and arrows. */
   syncVisuals(system) {
+    // the body whose surface the camera is standing on: its own trail, drop line and
+    // velocity arrow would all run through the camera, so they are left out of its view
+    const ridden = this.cam.view === 'surface' ? this.bodyVisuals[this.cam.focus] : null;
+    const dt = Math.min(this._spinClock.getDelta(), 0.1);
+
     for (const v of this.bodyVisuals) {
       const visible = !v.body.ejected;
       v.mesh.visible = visible;
+      // cosmetic spin about the body's own axis; keeps going while the sim is paused (and a
+      // surface camera turns with it, see _updateSurface)
+      v.spin += v.spinRate * dt;
+      v.mesh.quaternion.setFromAxisAngle(v.spinAxis, v.spin);
       if (visible) {
         v.mesh.position.copy(v.body.pos);
         v.mesh.scale.setScalar(v.body.radius);
-        v.mesh.rotation.x += 0.004;
-        v.mesh.rotation.y += 0.006;
       }
 
       // drop line from the body down to its projection on the xy plane
       const zl = v.zline;
-      zl.visible = visible && this.options.showZLines;
+      zl.visible = visible && this.options.showZLines && v !== ridden;
       if (zl.visible) {
         const p = zl.geometry.attributes.position.array;
         p[0] = v.body.pos.x; p[1] = v.body.pos.y; p[2] = v.body.pos.z;
@@ -317,19 +519,18 @@ export class SimScene {
       }
 
       this._updateTrailGeometry(v);
+      v.trail.visible = v !== ridden;
     }
 
-    // selection cage follows the selected body
+    // selection cage follows the selected body (not drawn around you while you stand on it)
+    const sel = this.bodyVisuals[this.selectedIndex];
+    const standingOn = this.cam.view === 'surface' && this.cam.focus === this.selectedIndex;
+    this.selectionBox.visible = !!sel && !sel.body.ejected && !standingOn;
     if (this.selectionBox.visible) {
-      const v = this.bodyVisuals[this.selectedIndex];
-      if (v && !v.body.ejected) {
-        this.selectionBox.position.copy(v.body.pos);
-        this.selectionBox.scale.setScalar(v.body.radius * 2.6);
-        this.selectionBox.rotation.y += 0.01;
-        this.selectionBox.rotation.x += 0.006;
-      } else {
-        this.selectionBox.visible = false;
-      }
+      this.selectionBox.position.copy(sel.body.pos);
+      this.selectionBox.scale.setScalar(sel.body.radius * 2.6);
+      this.selectionBox.rotation.y += 0.01;
+      this.selectionBox.rotation.x += 0.006;
     }
 
     // centre of mass
@@ -344,7 +545,7 @@ export class SimScene {
         const v = this.bodyVisuals[i];
         const arrow = this.arrows[i];
         const speed = v.body.vel.length();
-        if (v.body.ejected || speed < 1e-6) {
+        if (v.body.ejected || speed < 1e-6 || v === ridden) {
           arrow.visible = false;
           continue;
         }
@@ -362,13 +563,23 @@ export class SimScene {
     const pos = v.trail.geometry.attributes.position.array;
     const col = v.trail.geometry.attributes.color.array;
     const r = v.color.r, g = v.color.g, b = v.color.b;
+    const fr = this._fade.r, fg = this._fade.g, fb = this._fade.b;
+    // Ink styles fade by *displayed* brightness (mix in gamma space, then back to
+    // linear) so the dithered tail thins out evenly instead of vanishing early.
+    const gamma = this.theme.additive ? 1 : 2.2;
+    const ease = this.theme.trailEase;
+    const ig = 1 / gamma;
+    const dr = Math.pow(r, ig), dg = Math.pow(g, ig), db = Math.pow(b, ig);
+    const dfr = Math.pow(fr, ig), dfg = Math.pow(fg, ig), dfb = Math.pow(fb, ig);
     for (let k = 0; k < n; k++) {
       const p = pts[k];
       const o = k * 3;
       pos[o] = p.x; pos[o + 1] = p.y; pos[o + 2] = p.z;
       const t = n > 1 ? k / (n - 1) : 1; // 0 at tail -> 1 at head
-      const f = t * t; // ease so the fade hugs the head
-      col[o] = r * f; col[o + 1] = g * f; col[o + 2] = b * f;
+      const f = Math.pow(t, ease); // ease so the fade hugs the head
+      col[o] = Math.pow(dfr + (dr - dfr) * f, gamma);
+      col[o + 1] = Math.pow(dfg + (dg - dfg) * f, gamma);
+      col[o + 2] = Math.pow(dfb + (db - dfb) * f, gamma);
     }
     v.trail.geometry.setDrawRange(0, n);
     v.trail.geometry.attributes.position.needsUpdate = true;
@@ -377,14 +588,34 @@ export class SimScene {
 
   /** Snap the backdrop grid to the camera target so it appears infinite. */
   _updateGrid() {
-    this.grid.visible = this.options.showGrid;
-    if (!this.options.showGrid) return;
+    // (the flat grid is edge-on, a smear of lines, when you stand in the orbital plane)
+    this.grid.visible = this.options.showGrid && this.cam.view !== 'surface';
+    if (!this.grid.visible) return;
+    // Styles with `gridMinPx` coarsen the grid as the camera pulls back, so its lines never
+    // crowd closer than that many pixels. A 1-bit display cannot draw a dense field of thin
+    // lines cleanly: they merge into a black smear and shimmer as the camera moves.
+    let cell = GRID_CELL;
+    if (this.theme.gridMinPx) {
+      const mult = this._gridMultiplier();
+      this.grid.scale.setScalar(mult);
+      cell = GRID_CELL * mult;
+    }
     const t = this.controls.target;
-    this.grid.position.set(
-      Math.round(t.x / GRID_CELL) * GRID_CELL,
-      Math.round(t.y / GRID_CELL) * GRID_CELL,
-      0
-    );
+    this.grid.position.set(Math.round(t.x / cell) * cell, Math.round(t.y / cell) * cell, 0);
+  }
+
+  // Cell-size multiplier (1-2-5 ladder) that keeps grid lines at least `gridMinPx` apart where
+  // the camera is looking. Hysteresis so it doesn't flip back and forth at a boundary.
+  _gridMultiplier() {
+    const heightPx = this.renderer.domElement.height || 1;
+    const dist = Math.max(this.camera.position.distanceTo(this.controls.target), 1e-3);
+    const cellPx = (GRID_CELL * heightPx) / (2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2));
+    const min = this.theme.gridMinPx;
+    let lvl = this._gridLevel;
+    while (lvl < GRID_LADDER.length - 1 && cellPx * GRID_LADDER[lvl] < min) lvl++;
+    while (lvl > 0 && cellPx * GRID_LADDER[lvl - 1] >= min * 1.6) lvl--;
+    this._gridLevel = lvl;
+    return GRID_LADDER[lvl];
   }
 
   /** Move the camera so all active bodies fit comfortably in view. */
@@ -404,6 +635,10 @@ export class SimScene {
     this.controls.target.copy(com);
     this.camera.position.copy(com).add(dir);
     this.controls.update();
+    // while standing on a surface this is the pose to return to when leaving it
+    if (this.cam.view === 'surface') {
+      this._savedPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
+    }
   }
 
   setBloom(strength) {
@@ -413,38 +648,205 @@ export class SimScene {
   resize() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
+    if (!w || !h) return; // container hidden or collapsed
+    // re-derived here (not just in setTheme) so a display-scale / browser-zoom change is picked up
+    const pr = this._pixelRatioFor(this.theme);
+    if (pr !== this.renderer.getPixelRatio()) {
+      this.renderer.setPixelRatio(pr);
+      this.composer.setPixelRatio(pr);
+    }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
+    this._styleStars(); // star sizes are in whole render pixels, which depend on the pixel ratio
+  }
+
+  // ---- camera focus ----
+  //
+  // focus: 'free'  — the camera only moves when you move it.
+  //        'com'   — locked on the centre of mass: the camera travels with it, keeping
+  //                  whatever distance/angle you give it; drag to orbit, scroll to zoom.
+  //        <index> — the same, locked on that body.
+  // view:  'orbit'   — look at the focus from outside (all focus kinds).
+  //        'surface' — (bodies only) stand on a random spot of the body's surface and
+  //                    look out at the rest of the system; drag to look around.
+
+  /** Set the camera focus and view; see above. A non-body focus always uses 'orbit'. */
+  setCamera(focus, view = 'orbit') {
+    if (!Number.isInteger(focus)) view = 'orbit';
+    const prev = this.cam;
+    const enteringSurface = view === 'surface' && prev.view !== 'surface';
+    const leavingSurface = view !== 'surface' && prev.view === 'surface';
+
+    if (enteringSurface) {
+      this._savedPose = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
+    }
+    if (leavingSurface && this._savedPose) {
+      this.camera.position.copy(this._savedPose.pos);
+      this.controls.target.copy(this._savedPose.target);
+      this._savedPose = null;
+    }
+
+    this.cam = { focus, view };
+    this._camSettle = 40;
+
+    const surface = view === 'surface';
+    this.camera.fov = surface ? SURFACE_FOV : BASE_FOV;
+    this.camera.near = surface ? SURFACE_NEAR : 0.1;
+    this.camera.updateProjectionMatrix();
+    this.controls.enabled = !surface; // the surface view does its own look-around (_bindSurfaceLook)
+    this.controls.enablePan = focus === 'free';
+    if (!surface) this.camera.up.set(0, 1, 0); // the surface view tips "up" to the local zenith
+
+    if (surface && (enteringSurface || prev.focus !== focus)) this.newSurfaceSpot();
+    if (leavingSurface) this.controls.update();
+  }
+
+  /** Pick a new random spot on the surface of the focused body (surface view only). */
+  newSurfaceSpot() {
+    // uniform random direction on the unit sphere
+    const u = Math.random() * 2 - 1;
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(1 - u * u);
+    this._spot.set(r * Math.cos(a), r * Math.sin(a), u);
+    this._surfaceInit = true; // resolved against the live positions on the next frame
+  }
+
+  // Position of the nearest other active body into `out` (a point far down -z if there is
+  // none). The nearest rather than the centroid, which can land in empty space between
+  // bodies on opposite sides.
+  _nearestOther(body, out) {
+    let best = Infinity;
+    for (const v of this.bodyVisuals) {
+      if (v.body === body || v.body.ejected) continue;
+      const d = v.body.pos.distanceToSquared(body.pos);
+      if (d < best) { best = d; out.copy(v.body.pos); }
+    }
+    if (best === Infinity || best < 1e-9) out.copy(body.pos).z -= 100;
+    return out;
+  }
+
+  // The focus point this frame, or null for a free camera. If the focused body has been
+  // merged away / ejected, quietly fall back to the centre of mass and tell the UI.
+  _focusPoint() {
+    const { focus } = this.cam;
+    if (focus === 'free') return null;
+    if (focus === 'com') return this._com;
+    const v = this.bodyVisuals[focus];
+    if (v && !v.body.ejected) return v.body.pos;
+    this.setCamera('com', 'orbit');
+    if (this.onCameraChange) this.onCameraChange(this.cam);
+    return this._com;
+  }
+
+  // Locked orbit: translate the camera and its pivot together by however far the focus has
+  // moved, which preserves the user's distance and viewing angle exactly. For a few frames
+  // after a focus change the pivot eases onto the new focus instead of jumping.
+  _updateChase(anchor) {
+    const k = this._camSettle > 0 ? 0.18 : 1;
+    if (this._camSettle > 0) this._camSettle--;
+    this._tmp.subVectors(anchor, this.controls.target).multiplyScalar(k);
+    this.camera.position.add(this._tmp);
+    this.controls.target.add(this._tmp);
+    this.controls.update();
+  }
+
+  // Surface view: you are standing on the body. The camera is bolted to one point of its
+  // surface (just above the ground) and "up" is the local zenith, straight away from the
+  // body's centre. That point is fixed in the body's own spinning frame, so you ride both the
+  // body's motion through the sim and its spin about its axis: the ground stays put under you
+  // while the stars and the other bodies wheel across the sky, even with the sim paused. You
+  // start looking straight up and can drag to look around, down to the ground and back up.
+  _updateSurface(v) {
+    const cam = this.camera;
+    const body = v.body;
+    const spin = v.mesh.quaternion; // the body's current spin (set in syncVisuals)
+
+    if (this._surfaceInit) {
+      this._surfaceInit = false;
+      const other = this._nearestOther(body, this._tmp);
+      // the random spot, mirrored into the half of the body that faces its nearest
+      // neighbour, so the sky holds the sim rather than the far side of the body
+      const toOther = this._tmp2.subVectors(other, body.pos).normalize();
+      const n = this._surfaceN.copy(this._spot);
+      const d = n.dot(toOther);
+      if (d < 0) n.addScaledVector(toOther, -2 * d);
+      n.normalize();
+      // horizontal axes: e1 points toward that neighbour's bearing (so tilting down from straight
+      // up sweeps toward it); e2 = n x e1 is to the left
+      const e1 = this._surfaceE1.copy(toOther).addScaledVector(n, -toOther.dot(n));
+      if (e1.lengthSq() < 1e-8) {
+        e1.set(Math.abs(n.z) < 0.9 ? 0 : 1, 0, Math.abs(n.z) < 0.9 ? 1 : 0);
+        e1.addScaledVector(n, -e1.dot(n));
+      }
+      e1.normalize();
+      this._surfaceE2.crossVectors(n, e1);
+      // pin the frame to the body: store it in the body's spinning coordinates
+      this._qInv.copy(spin).invert();
+      this._surfaceNL.copy(n).applyQuaternion(this._qInv);
+      this._surfaceE1L.copy(e1).applyQuaternion(this._qInv);
+      this._surfaceE2L.copy(this._surfaceE2).applyQuaternion(this._qInv);
+      this._yaw = 0;
+      this._pitch = SURFACE_MAX_PITCH;
+    }
+
+    // where the standing frame has spun to this frame
+    const n = this._surfaceN.copy(this._surfaceNL).applyQuaternion(spin);
+    this._surfaceE1.copy(this._surfaceE1L).applyQuaternion(spin);
+    this._surfaceE2.copy(this._surfaceE2L).applyQuaternion(spin);
+    const seat = this._tmp.copy(body.pos).addScaledVector(n, body.radius * SURFACE_EYE);
+    const cp = Math.cos(this._pitch);
+    const look = this._tmp2.set(0, 0, 0)
+      .addScaledVector(this._surfaceE1, cp * Math.cos(this._yaw))
+      .addScaledVector(this._surfaceE2, cp * Math.sin(this._yaw))
+      .addScaledVector(n, Math.sin(this._pitch));
+
+    cam.up.copy(n);
+    cam.position.copy(seat);
+    this.controls.target.copy(seat).add(look); // keep the orbit pivot sane for leaving the view
+    cam.lookAt(this.controls.target);
+  }
+
+  // Drag-to-look for the surface view. "Grab the sky": a pixel of drag moves the image by a
+  // pixel, so dragging right turns the view left. Yaw is unbounded; pitch stops at straight
+  // up / straight down.
+  _bindSurfaceLook() {
+    const dom = this.renderer.domElement;
+    let drag = null;
+    dom.addEventListener('pointerdown', (e) => {
+      if (this.cam.view !== 'surface' || e.button !== 0) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      try { dom.setPointerCapture(e.pointerId); } catch { /* pointer already gone: drag still works while over the canvas */ }
+    });
+    dom.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const radiansPerPx = THREE.MathUtils.degToRad(this.camera.fov) / (this.container.clientHeight || 1);
+      this._yaw += (e.clientX - drag.x) * radiansPerPx;
+      this._pitch = THREE.MathUtils.clamp(
+        this._pitch + (e.clientY - drag.y) * radiansPerPx, -SURFACE_MAX_PITCH, SURFACE_MAX_PITCH);
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+    });
+    const end = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
+    dom.addEventListener('pointerup', end);
+    dom.addEventListener('pointercancel', end);
   }
 
   render() {
-    // TRACK COM: rigidly translate the whole camera rig (position + target) by
-    // the COM's displacement since last frame, so it travels with the system at
-    // the distance/offset locked in the moment tracking was switched on. Moving
-    // both ends by the same delta preserves that offset exactly; the user can
-    // still orbit/zoom by hand to change it.
-    if (this.options.trackCOM) {
-      if (!this._tracking) { this._tracking = true; this._comPrev.copy(this._com); }
-      this._tmp.subVectors(this._com, this._comPrev);
-      this.camera.position.add(this._tmp);
-      this.controls.target.add(this._tmp);
-      this._comPrev.copy(this._com);
+    const anchor = this._focusPoint();
+    if (!anchor) {
+      this.controls.update();
+    } else if (this.cam.view === 'surface') {
+      this._updateSurface(this.bodyVisuals[this.cam.focus]);
     } else {
-      this._tracking = false;
+      this._updateChase(anchor);
     }
 
-    // FOLLOW COM: keep the orbit target locked on the COM so the camera always
-    // points at it. Independent of tracking — works alone or layered on top of a
-    // tracking shot to actively re-centre the framing.
-    if (this.options.followCOM) {
-      this.controls.target.lerp(this._com, 0.1);
-    }
-
+    this.stars.visible = this.options.showStars;
+    this.stars.position.copy(this.camera.position); // keep the sky at infinity
     this._updateGrid();
     this.fx.update();
-    this.controls.update();
     this.composer.render();
   }
 }

@@ -19,16 +19,35 @@ via an import map, plain ES modules, no install and no build step.
 - **Click-to-edit bodies** — click any body (or CUSTOM) to select it and tune its mass, size,
   position (x/y/z) and velocity (x/y/z); the edit becomes the new starting state.
 - **Orbital trails** that fade behind each body — the signature view of the chaotic dance.
+- **Star field** — a fixed background sky (toggle with `B`) so camera turns read clearly, even
+  when no body is in view; each body also spins steadily on its own tilted axis.
 - **Collisions & impact bursts** — optionally let close bodies merge, with a cosmetic phosphor
   burst on contact.
 - **Live telemetry** — total energy, energy-drift %, centre-of-mass offset, per-body speed.
-- **3D camera** — orbit (drag), zoom (scroll), pan (right-drag); auto-frame; plus two
-  centre-of-mass modes that work alone or together: **follow** (stay put, keep aiming at the
-  COM) and **track** (travel with the COM at a locked distance — a dolly shot).
+- **3D camera with a focus** — orbit (drag), zoom (scroll), pan (right-drag), auto-frame, and a
+  **Focus** you choose in the CAMERA section (or with `0`–`4`):
+  - **Free** — the camera stays where you put it.
+  - **Center of Mass** or **Body A / B / C** — the camera locks on and travels with it, keeping
+    the distance and angle you give it (drag to orbit, scroll to zoom).
+  - **Surface** (any body) — stand on a random spot of that body's surface, looking straight up
+    and away from its center. You ride the body's motion *and* its spin about its own axis
+    (which keeps turning while the sim is paused), so the ground stays fixed beneath you while
+    the stars and other bodies wheel across a wide-angle sky. Drag to look around, **New Spot**
+    picks another point. If the body you are
+    following is merged away the camera drops back to the center of mass.
+  A line under the buttons always says what the current choice does.
 - **Save / load setups** — export the current bodies and parameters to a small JSON text file
   and import it back; imports are fully validated and sanitised before they touch the sim.
-- **CRT terminal aesthetic** — early-CG low-poly wireframe bodies, a phosphor glow (bloom),
-  scanlines, dashed z-height drop lines, and a blue centre-of-mass crosshair on a faint grid.
+- **Selectable UI styles** — pick one in the **UI STYLE** section of the panel (or press `U` to
+  cycle); the choice is remembered, and `?theme=mac` / `?theme=crt` in the URL overrides it:
+  - **CRT Terminal** (default) — early-CG low-poly wireframe bodies, a phosphor glow (bloom),
+    scanlines, dashed z-height drop lines, and a blue centre-of-mass crosshair on a faint grid.
+  - **Classic Mac** and **Classic Mac Dark** (the same desktop in inverse video) — a 1-bit
+    black-and-white System 6/7 desktop: menu bar, a striped-title-bar
+    scene window and a closable Controls palette with a classic scrollbar, rounded push buttons
+    with a heavy default ring, tick-mark sliders, Balloon-Help tooltips, and the dithered grey
+    desktop. The 3D view is rendered as black ink on white and finished with an ordered dither,
+    so fading trails, the grid and impact bursts become stippled MacPaint-style patterns.
 
 ## Run it locally
 
@@ -79,7 +98,11 @@ this folder is already clean of that.
 | Toggle grid           | grid                        | `G` |
 | Toggle velocity       | velocity                    | `V` |
 | Toggle z-height lines | z-height                    | `Z` |
+| Toggle stars          | stars                       | `B` |
 | Cycle collisions      | collisions                  | `C` |
+| Camera focus          | CAMERA › Focus              | `0` free, `1`–`3` body A–C, `4` center of mass |
+| Surface view          | CAMERA › View from          | `P` |
+| Cycle UI style        | UI STYLE                    | `U` |
 | Orbit / zoom / pan    | drag / scroll / right-drag  |     |
 
 **Parameters:** `speed` (time scale), `quality` (integration sub-steps), `gravity G`,
@@ -89,16 +112,35 @@ this folder is already clean of that.
 
 ```
 index.html        markup + Three.js import map
-styles.css        CRT terminal styling
+styles.css        shared layout + the default CRT terminal style
+themes/
+  mac.css         Classic Mac (System 6/7) styles, scoped to html[data-theme^='mac']
 src/
   main.js         bootstrap, controller, fixed-step animation loop
   physics.js      NBodySystem: Velocity-Verlet integrator, energy, centre of mass
   presets.js      named initial conditions
-  scene.js        Three.js scene, bodies, trails, grid, picking, bloom post-processing
-  ui.js           CRT terminal control panel and telemetry
+  scene.js        Three.js scene, bodies, trails, grid, picking, bloom / 1-bit dither post-processing
+  ui.js           control panel and telemetry
+  themes.js       UI style registry (3D scene look per style) + saved choice
+  icons.js        pixel-art button icons, shared by every style
   io.js           export / import of setups, with validation + sanitisation
   effects.js      cosmetic collision / impact bursts
 ```
+
+## Adding a UI style
+
+A style is two halves that switch together:
+
+1. **CSS** — `themes/<id>.css`, with every selector scoped to `html[data-theme='<id>']`, linked
+   from `index.html`. Markup labels are written in Title Case (the CRT style upper-cases them
+   with CSS), and a button's leading symbol (`▶ Start`) becomes a pixel icon from `src/icons.js`
+   in an `.ic` span that takes the button's text colour.
+2. **Scene** — an entry in `src/themes.js` (background, ink colour or per-body colours, grid,
+   blending, bloom, optional 1-bit dither). It then appears in the UI STYLE section automatically.
+
+Styles only change how things look; they never touch the simulation. The Classic Mac style sizes
+everything in "screen pixels" (`--px`), chosen as a whole number of device pixels so the bitmap
+type and dither patterns stay crisp at 125% scaling, on retina displays and under browser zoom.
 
 ## A note on units
 

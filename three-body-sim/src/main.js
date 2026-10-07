@@ -12,6 +12,7 @@ import { SimScene } from './scene.js';
 import { createUI } from './ui.js';
 import { presets } from './presets.js';
 import { serializeSetup, parseSetup } from './io.js';
+import { themeOrder, initialTheme, resolveTheme, saveTheme, applyPixelUnit } from './themes.js';
 
 const BASE_DT = 0.05;       // step size at quality = 1
 const TIME_SCALE = 15;      // simulation-seconds per real second at speed = 1
@@ -20,7 +21,8 @@ const MAX_STEPS_PER_FRAME = 2000; // guard against the spiral of death
 const WHITE = new THREE.Color(0xffffff);
 
 const container = document.getElementById('scene');
-const scene = new SimScene(container);
+const startTheme = initialTheme();
+const scene = new SimScene(container, startTheme.scene);
 const system = new NBodySystem({ G: 1, softening: 0.4 });
 
 function cloneCfg(c) {
@@ -31,7 +33,7 @@ const app = {
   scene,
   system,
   options: scene.options,
-  state: { running: false, speed: 1, substeps: 5, G: 1, softening: 0.4, trailLength: 700, presetId: 'default', collisionMode: 'off', restitution: 0.5 },
+  state: { running: false, speed: 1, substeps: 5, G: 1, softening: 0.4, trailLength: 700, presetId: 'default', collisionMode: 'off', restitution: 0.5, theme: startTheme.id, camera: { focus: 'free', view: 'orbit' } },
   // seeded from the default preset; the UI edits these in place
   custom: { bodies: presets.default.build().bodies.map(cloneCfg) },
 
@@ -218,6 +220,22 @@ const app = {
     this._lastImpact = ev;
   },
 
+  // ---- UI style ----
+  // Switches the CSS skin (via html[data-theme]) and the 3D scene's look
+  // together. Display-only: nothing here touches the simulation state.
+  setTheme(id, { persist = true } = {}) {
+    const theme = resolveTheme(id);
+    this.state.theme = theme.id;
+    document.documentElement.dataset.theme = theme.id;
+    scene.setTheme(theme.scene);
+    ui.setTheme(theme.id);
+    if (persist) saveTheme(theme.id);
+  },
+  cycleTheme() {
+    const i = themeOrder.indexOf(this.state.theme);
+    this.setTheme(themeOrder[(i + 1) % themeOrder.length]);
+  },
+
   setOption(name, val) {
     scene.options[name] = val;
   },
@@ -225,7 +243,45 @@ const app = {
     this.setOption(name, !scene.options[name]);
     ui.syncToggles();
   },
-  frameAll() { scene.autoFrame(system); },
+  frameAll() {
+    // framing the whole system is an outside view: step off a body's surface first
+    const { focus, view } = this.state.camera;
+    if (view === 'surface') this.setCamera(focus, 'orbit');
+    scene.autoFrame(system);
+  },
+
+  // ---- camera focus ----
+  // focus: 'free' | 'com' | body index; view: 'orbit' | 'surface' (bodies only).
+  // See SimScene.setCamera in scene.js for exactly what each combination does.
+  setCamera(focus, view = 'orbit') {
+    if (Number.isInteger(focus)) {
+      const b = system.bodies[focus];
+      if (!b || b.ejected) return; // nothing there to look at
+    } else {
+      view = 'orbit';
+    }
+    this.state.camera = { focus, view };
+    scene.setCamera(focus, view);
+    ui.setCamera(this.state.camera);
+  },
+  // choosing a new focus keeps a surface view if you were already standing on a body
+  setCameraFocus(focus) {
+    const keepSurface = Number.isInteger(focus) && this.state.camera.view === 'surface';
+    this.setCamera(focus, keepSurface ? 'surface' : 'orbit');
+  },
+  setCameraView(view) {
+    const { focus } = this.state.camera;
+    if (Number.isInteger(focus)) this.setCamera(focus, view);
+  },
+  // P: ride the focused body, or the selected / first body when nothing is focused
+  toggleSurface() {
+    const { focus, view } = this.state.camera;
+    if (Number.isInteger(focus)) return this.setCamera(focus, view === 'surface' ? 'orbit' : 'surface');
+    this.setCamera(this.selectedIndex >= 0 ? this.selectedIndex : 0, 'surface');
+  },
+  newSurfaceSpot() {
+    if (this.state.camera.view === 'surface') scene.newSurfaceSpot();
+  },
 
   _advance(dt) {
     system.step(dt);
@@ -261,6 +317,8 @@ const ui = createUI(app);
 // Route physics impacts to the controller, and seed the system with the current
 // collision settings (these persist across preset loads — setBodies leaves them).
 system.onCollision = (ev) => app._onCollision(ev);
+// the scene drops the camera back to the centre of mass if the body it follows is merged away
+scene.onCameraChange = (cam) => { app.state.camera = { ...cam }; ui.setCamera(app.state.camera); };
 system.collisionMode = app.state.collisionMode;
 system.restitution = app.state.restitution;
 
@@ -310,9 +368,20 @@ function frame() {
   ui.update();
 }
 
-window.addEventListener('resize', () => scene.resize());
+// Track the container rather than the window: some UI styles lay the scene out
+// in a window beside the control panel, so its size changes when the panel is
+// shown/hidden or the style is switched, not just when the browser is resized.
+new ResizeObserver(() => scene.resize()).observe(container);
+
+// Display-scale / browser-zoom changes fire `resize`: re-publish the screen-pixel unit
+// (pixel-font styles size everything from it) and re-derive the render resolution.
+window.addEventListener('resize', () => { applyPixelUnit(); scene.resize(); });
 
 // boot
+applyPixelUnit();
+document.documentElement.dataset.theme = startTheme.id;
+ui.setTheme(startTheme.id);
+ui.setCamera(app.state.camera);
 app.loadPreset('default', { autoplay: true });
 ui.syncToggles();
 ui.setCollisionMode(app.state.collisionMode);

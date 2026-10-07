@@ -36,7 +36,7 @@ function scaleBodies(bodies, scale) {
 
 export const presets = {
   default: {
-    label: 'DEFAULT',
+    label: 'Default',
     build() {
       // Equilateral triangle in the z=0 plane with gentle tangential velocities.
       // Not a periodic solution — it dissolves into the chaos that makes the
@@ -56,7 +56,7 @@ export const presets = {
   },
 
   figure8: {
-    label: 'FIGURE-8',
+    label: 'Figure-8',
     build() {
       // Chenciner–Montgomery figure-eight choreography (G=1, m=1). Three equal
       // masses chase each other around a single figure-eight curve. It is a
@@ -74,7 +74,7 @@ export const presets = {
   },
 
   lagrange: {
-    label: 'LAGRANGE',
+    label: 'Lagrange',
     build() {
       // Exact rotating equilateral triangle (Lagrange L4/L5 family). For three
       // equal masses at circumradius R, circular angular speed gives
@@ -95,7 +95,7 @@ export const presets = {
   },
 
   binary: {
-    label: 'BINARY+3RD',
+    label: 'Binary+3rd',
     build() {
       // A tight, heavy binary with a light companion on a wide orbit —
       // a hierarchical system that stays bound and readable for a long time.
@@ -109,7 +109,7 @@ export const presets = {
   },
 
   random: {
-    label: 'RANDOM',
+    label: 'Random',
     build() {
       // Random masses, fully 3D positions and small velocities. Momentum is
       // zeroed by setBodies(); the camera auto-frames since extent is unknown.

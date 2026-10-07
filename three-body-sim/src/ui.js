@@ -5,6 +5,8 @@
 // live numbers back each frame via app.getReadouts(). No Three.js or physics here.
 
 import { presets, presetOrder, COLORS } from './presets.js';
+import { THEMES, themeOrder } from './themes.js';
+import { hasIcon, iconSvg } from './icons.js';
 
 // ---- tiny DOM helpers -------------------------------------------------------
 
@@ -33,8 +35,23 @@ function section(title, ...children) {
   return sec;
 }
 
+// Button labels are written in Title Case and may start with a symbol ("▶ Start").
+// The symbol is swapped for a pixel icon (icons.js) in its own span, so it looks the same in
+// every style whatever the font has; the CRT style upper-cases the text with CSS.
+function setButtonLabel(b, label) {
+  b.textContent = '';
+  if (label[1] === ' ' && hasIcon(label[0])) {
+    const ic = el('span', { class: 'ic' });
+    ic.innerHTML = iconSvg(label[0]); // static markup from icons.js, no user input
+    b.append(ic, ' ', label.slice(2));
+  } else {
+    b.textContent = label;
+  }
+}
+
 function button(label, onclick, extraClass = '', tip) {
-  const b = el('button', { class: `btn ${extraClass}`.trim(), type: 'button', text: label, onclick });
+  const b = el('button', { class: `btn ${extraClass}`.trim(), type: 'button', onclick });
+  setButtonLabel(b, label);
   if (tip) b.setAttribute('data-tip', tip);
   return b;
 }
@@ -82,8 +99,10 @@ function setupTooltips() {
     const t = tip.getBoundingClientRect();
     let left = r.left - t.width - 12;
     let top = r.top + r.height / 2 - t.height / 2;
-    if (left < 8) { left = Math.min(r.left, window.innerWidth - t.width - 8); top = r.bottom + 8; }
+    let side = 'left';
+    if (left < 8) { left = Math.min(r.left, window.innerWidth - t.width - 8); top = r.bottom + 8; side = 'below'; }
     top = Math.max(8, Math.min(top, window.innerHeight - t.height - 8));
+    tip.dataset.side = side; // lets a style point a speech-balloon tail at the target
     tip.style.left = Math.max(8, left) + 'px';
     tip.style.top = top + 'px';
   };
@@ -99,14 +118,6 @@ function setupTooltips() {
 }
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-
-// Impact-severity colours, matching the phosphor palette: calm green up to an
-// alarming red.
-const CLASS_COLOR = {
-  merge: '#4dff88',
-  disruption: '#ffc24d',
-  catastrophic: '#ff6b6b',
-};
 
 // Trigger a client-side download of `text` as a file. Pure DOM + Blob: the data
 // never leaves the browser, so there is no network/upload surface.
@@ -140,17 +151,19 @@ function sanitizeFilename(name) {
 
 export function createUI(app) {
   const topbar = document.getElementById('topbar');
-  const panel = document.getElementById('panel');
+  // the scrolling area of the control panel (the window chrome around it is static markup)
+  const panel = document.getElementById('panel-body');
+  const sceneTitle = document.getElementById('scene-title-text');
 
   // ---------- top bar ----------
-  const statusPill = el('span', { class: 'status', text: 'PAUSED' });
+  const statusPill = el('span', { class: 'status', text: 'Paused' });
   const fpsEl = el('span', { class: 'stat', text: 'FPS --' });
   const timeEl = el('span', { class: 'stat', text: 'T 0.0' });
   const helpBtn = el('button', { class: 'help-btn', type: 'button', text: '?', title: 'controls' });
   topbar.append(
     el('div', { class: 'brand' }, [
       el('span', { class: 'brand-mark', text: '◤◢' }),
-      el('span', { text: 'THREE-BODY SIM' }),
+      el('span', { class: 'brand-name', text: 'Three-Body Sim' }),
       el('span', { class: 'brand-ver', text: 'v1.27' }),
     ]),
     el('div', { class: 'topstats' }, [statusPill, fpsEl, timeEl, helpBtn])
@@ -158,21 +171,25 @@ export function createUI(app) {
 
   // ---------- help popover ----------
   const popover = el('div', { class: 'popover hidden' }, [
-    el('div', { class: 'popover-title', text: 'CONTROLS' }),
+    el('div', { class: 'popover-title' }, [el('span', { class: 'win-title-text', text: 'Controls' })]),
     el('div', { class: 'popover-grid', html: `
-      <span>drag</span><span>orbit camera</span>
-      <span>scroll</span><span>zoom</span>
-      <span>right-drag</span><span>pan</span>
-      <span>click body</span><span>select &amp; edit</span>
-      <span class="k">SPACE</span><span>play / pause</span>
-      <span class="k">R</span><span>reset</span>
-      <span class="k">S</span><span>step</span>
-      <span class="k">N</span><span>random</span>
-      <span class="k">F</span><span>frame all</span>
-      <span class="k">T / G / V</span><span>trails / grid / velocity</span>
-      <span class="k">Z</span><span>z-height lines</span>
-      <span class="k">C</span><span>cycle collisions</span>
-      <span class="k">ESC</span><span>deselect</span>
+      <span>Drag</span><span>Orbit camera</span>
+      <span>Scroll</span><span>Zoom</span>
+      <span>Right-drag</span><span>Pan</span>
+      <span>Click body</span><span>Select &amp; edit</span>
+      <span class="k">SPACE</span><span>Play / pause</span>
+      <span class="k">R</span><span>Reset</span>
+      <span class="k">S</span><span>Step</span>
+      <span class="k">N</span><span>Random</span>
+      <span class="k">F</span><span>Frame all</span>
+      <span class="k">T / G / V</span><span>Trails / grid / velocity</span>
+      <span class="k">Z</span><span>Z-height lines</span>
+      <span class="k">B</span><span>Stars</span>
+      <span class="k">C</span><span>Cycle collisions</span>
+      <span class="k">0 – 4</span><span>Camera: free / A / B / C / COM</span>
+      <span class="k">P</span><span>Ride the body (surface view)</span>
+      <span class="k">U</span><span>Cycle UI style</span>
+      <span class="k">ESC</span><span>Deselect</span>
     ` }),
   ]);
   document.body.appendChild(popover);
@@ -182,13 +199,13 @@ export function createUI(app) {
   });
 
   // ---------- sim control ----------
-  const playBtn = button('▶ START', () => app.toggle(), 'btn-primary', 'Play or pause the simulation (Space)');
+  const playBtn = button('▶ Start', () => app.toggle(), 'btn-primary', 'Play or pause the simulation (Space)');
   panel.appendChild(
-    section('SIM CONTROL',
+    section('Sim Control',
       el('div', { class: 'btn-grid three' }, [
         playBtn,
-        button('⏭ STEP', () => app.step(), '', 'Advance one step while paused (S)'),
-        button('↺ RESET', () => app.reset(), '', "Return all bodies to the configuration's starting state (R)"),
+        button('⏭ Step', () => app.step(), '', 'Step the simulation forward one tick, then hold (S)'),
+        button('↺ Reset', () => app.reset(), '', "Return all bodies to the configuration's starting state (R)"),
       ])
     )
   );
@@ -209,10 +226,10 @@ export function createUI(app) {
     presetBtns[id] = b;
     presetRow.appendChild(b);
   }
-  const customBtn = button('CUSTOM', () => app.enterCustom(), '', presetTips.custom);
+  const customBtn = button('Custom', () => app.enterCustom(), '', presetTips.custom);
   presetBtns.custom = customBtn;
   presetRow.appendChild(customBtn);
-  panel.appendChild(section('CONFIGURATION', presetRow));
+  panel.appendChild(section('Configuration', presetRow));
 
   // ---------- save / load ----------
   // Export downloads the current setup as JSON text; import reads a text file
@@ -252,10 +269,10 @@ export function createUI(app) {
   // suggested name the user can edit) plus SAVE / CANCEL. The download only
   // happens on SAVE, after the typed name is sanitised.
   const nameInput = el('input', { type: 'text', class: 'io-name', spellcheck: 'false', autocomplete: 'off' });
-  const saveBtn = button('✓ SAVE', () => confirmExport(), 'btn-primary', 'Download the setup with this name');
-  const cancelExportBtn = button('✕ CANCEL', () => hideExportForm(), '', 'Dismiss without saving');
+  const saveBtn = button('✓ Save', () => confirmExport(), 'btn-primary', 'Download the setup with this name');
+  const cancelExportBtn = button('✕ Cancel', () => hideExportForm(), '', 'Dismiss without saving');
   const exportForm = el('div', { class: 'io-form hidden' }, [
-    el('label', { class: 'io-name-label', text: 'file name' }),
+    el('label', { class: 'io-name-label', text: 'File name' }),
     nameInput,
     el('div', { class: 'btn-grid' }, [saveBtn, cancelExportBtn]),
   ]);
@@ -285,10 +302,10 @@ export function createUI(app) {
     else if (e.key === 'Escape') { e.preventDefault(); hideExportForm(); }
   });
 
-  const exportBtn = button('⭱ EXPORT', () => showExportForm(), '', 'Save the current bodies and parameters to a text file');
-  const importBtn = button('⭳ IMPORT', () => fileInput.click(), '', 'Load a setup from a previously exported text file');
+  const exportBtn = button('⭱ Export', () => showExportForm(), '', 'Save the current bodies and parameters to a text file');
+  const importBtn = button('⭳ Import', () => fileInput.click(), '', 'Load a setup from a previously exported text file');
 
-  panel.appendChild(section('SAVE / LOAD',
+  panel.appendChild(section('Save / Load',
     el('div', { class: 'btn-grid' }, [importBtn, exportBtn]),
     exportForm,
     fileInput,
@@ -306,30 +323,30 @@ export function createUI(app) {
   const bodySelBtns = [];
   const bodySelRow = el('div', { class: 'btn-grid' });
   for (let i = 0; i < 3; i++) {
-    const b = button(`BODY ${'ABC'[i]}`, () => app.selectBody(i), '', `Select & edit body ${'ABC'[i]}`);
+    const b = button(`Body ${'ABC'[i]}`, () => app.selectBody(i), '', `Select & edit body ${'ABC'[i]}`);
     bodySelBtns.push(b);
     bodySelRow.appendChild(b);
   }
   const editTitle = el('div', { class: 'custom-body-title' });
   const editorBody = el('div', { class: 'custom-body' }, [
     editTitle,
-    mk('mass', 'mass', { min: 0.1, max: 12, step: 0.1, value: 1, tip: 'Body mass — drives its gravity and how the others respond' }),
-    mk('size', 'radius', { min: 0.4, max: 6, step: 0.1, value: 1, tip: 'Visual radius only — cosmetic, does not affect gravity' }),
-    mk('pos x', 'px', { min: -40, max: 40, step: 0.5, value: 0, format: (v) => v.toFixed(1), tip: 'Starting position along the X axis' }),
-    mk('pos y', 'py', { min: -40, max: 40, step: 0.5, value: 0, format: (v) => v.toFixed(1), tip: 'Starting position along the Y axis' }),
-    mk('pos z', 'pz', { min: -40, max: 40, step: 0.5, value: 0, format: (v) => v.toFixed(1), tip: 'Starting position along the Z axis (depth)' }),
-    mk('vel x', 'vx', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the X axis' }),
-    mk('vel y', 'vy', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the Y axis' }),
-    mk('vel z', 'vz', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the Z axis (depth)' }),
+    mk('Mass', 'mass', { min: 0.1, max: 12, step: 0.1, value: 1, tip: 'Body mass — drives its gravity and how the others respond' }),
+    mk('Size', 'radius', { min: 0.4, max: 6, step: 0.1, value: 1, tip: 'Visual radius only — cosmetic, does not affect gravity' }),
+    mk('Pos X', 'px', { min: -40, max: 40, step: 0.5, value: 0, format: (v) => v.toFixed(1), tip: 'Starting position along the X axis' }),
+    mk('Pos Y', 'py', { min: -40, max: 40, step: 0.5, value: 0, format: (v) => v.toFixed(1), tip: 'Starting position along the Y axis' }),
+    mk('Pos Z', 'pz', { min: -40, max: 40, step: 0.5, value: 0, format: (v) => v.toFixed(1), tip: 'Starting position along the Z axis (depth)' }),
+    mk('Vel X', 'vx', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the X axis' }),
+    mk('Vel Y', 'vy', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the Y axis' }),
+    mk('Vel Z', 'vz', { min: -1.5, max: 1.5, step: 0.01, value: 0, tip: 'Starting velocity along the Z axis (depth)' }),
   ]);
   const editorHead = el('div', { class: 'section-title' }, [
     el('span', { class: 'section-arrow', text: '▾' }),
-    el('span', { text: 'SELECTED BODY' }),
+    el('span', { text: 'Selected Body' }),
   ]);
   const editorSection = el('div', { class: 'section editor hidden' }, [
     editorHead,
     el('div', { class: 'section-body' }, [
-      el('div', { class: 'editor-hint', text: 'click a body in the scene, or pick one:' }),
+      el('div', { class: 'editor-hint', text: 'Click a body in the scene, or pick one:' }),
       bodySelRow,
       editorBody,
     ]),
@@ -338,12 +355,12 @@ export function createUI(app) {
   panel.appendChild(editorSection);
 
   // ---------- parameters ----------
-  const speedS = slider('speed', { min: 0.05, max: 4, step: 0.05, value: app.state.speed, format: (v) => v.toFixed(2) + 'x', tip: 'How fast simulation time passes. Pure playback speed — does not change accuracy.' }, (v) => app.setSpeed(v));
-  const qualS = slider('quality', { min: 1, max: 16, step: 1, value: app.state.substeps, format: (v) => v + ' sub', tip: 'Physics sub-steps per frame. Higher = smaller time steps = more accurate, but more CPU.' }, (v) => app.setSubsteps(v));
-  const gravS = slider('gravity G', { min: 0, max: 4, step: 0.05, value: app.state.G, tip: 'Gravitational constant. Higher = stronger pull between all bodies.' }, (v) => app.setG(v));
-  const softS = slider('softening', { min: 0.01, max: 3, step: 0.01, value: app.state.softening, tip: 'Softens gravity at very close range to prevent slingshot blow-ups. Larger = gentler near-collisions.' }, (v) => app.setSoftening(v));
-  const trailS = slider('trail', { min: 0, max: 2000, step: 50, value: app.state.trailLength, format: (v) => (v | 0) + '', tip: 'Length of the fading orbital trail behind each body (number of points). 0 = off.' }, (v) => app.setTrailLength(v));
-  panel.appendChild(section('PARAMETERS', speedS.row, qualS.row, gravS.row, softS.row, trailS.row));
+  const speedS = slider('Speed', { min: 0.05, max: 4, step: 0.05, value: app.state.speed, format: (v) => v.toFixed(2) + 'x', tip: 'How fast simulation time passes. Pure playback speed — does not change accuracy.' }, (v) => app.setSpeed(v));
+  const qualS = slider('Quality', { min: 1, max: 16, step: 1, value: app.state.substeps, format: (v) => v + ' sub', tip: 'Physics sub-steps per frame. Higher = smaller time steps = more accurate, but more CPU.' }, (v) => app.setSubsteps(v));
+  const gravS = slider('Gravity G', { min: 0, max: 4, step: 0.05, value: app.state.G, tip: 'Gravitational constant. Higher = stronger pull between all bodies.' }, (v) => app.setG(v));
+  const softS = slider('Softening', { min: 0.01, max: 3, step: 0.01, value: app.state.softening, tip: 'Softens gravity at very close range to prevent slingshot blow-ups. Larger = gentler near-collisions.' }, (v) => app.setSoftening(v));
+  const trailS = slider('Trail', { min: 0, max: 2000, step: 50, value: app.state.trailLength, format: (v) => (v | 0) + '', tip: 'Length of the fading orbital trail behind each body (number of points). 0 = off.' }, (v) => app.setTrailLength(v));
+  panel.appendChild(section('Parameters', speedS.row, qualS.row, gravS.row, softS.row, trailS.row));
 
   // ---------- collisions ----------
   // Mode selector (OFF / MERGE / BOUNCE) + restitution, plus a live report of the
@@ -351,9 +368,9 @@ export function createUI(app) {
   // bodies' own gravitational binding energy.
   const collModeBtns = {};
   const collModeDefs = [
-    ['off', 'OFF', 'Bodies pass straight through each other — pure point-mass gravity'],
-    ['merge', 'MERGE', 'On contact, bodies coalesce into one. Momentum and mass conserved.'],
-    ['bounce', 'BOUNCE', 'On contact, bodies rebound as solid spheres (see restitution).'],
+    ['off', 'Off', 'Bodies pass straight through each other — pure point-mass gravity'],
+    ['merge', 'Merge', 'On contact, bodies coalesce into one. Momentum and mass conserved.'],
+    ['bounce', 'Bounce', 'On contact, bodies rebound as solid spheres (see restitution).'],
   ];
   const collModeRow = el('div', { class: 'btn-grid three' });
   for (const [id, label, tip] of collModeDefs) {
@@ -361,23 +378,24 @@ export function createUI(app) {
     collModeBtns[id] = b;
     collModeRow.appendChild(b);
   }
-  const restS = slider('restitution', { min: 0, max: 1, step: 0.05, value: app.state.restitution, tip: 'Bounciness in BOUNCE mode: 0 = fully inelastic (sticky), 1 = perfectly elastic. Below 1 the impact bleeds off energy.' }, (v) => app.setRestitution(v));
+  const restS = slider('Restitution', { min: 0, max: 1, step: 0.05, value: app.state.restitution, tip: 'Bounciness in BOUNCE mode: 0 = fully inelastic (sticky), 1 = perfectly elastic. Below 1 the impact bleeds off energy.' }, (v) => app.setRestitution(v));
 
-  const impClass = el('span', { class: 'ro-val', text: '—' });
+  // impact class is styled per UI style via [data-sev] (see styles.css / themes/)
+  const impClass = el('span', { class: 'ro-val caps', text: '—' });
   const impPair = el('span', { class: 'ro-val', text: '—' });
   const impSpeed = el('span', { class: 'ro-val', text: '—' });
   const impEnergy = el('span', { class: 'ro-val', text: '—' });
   const impSeverity = el('span', { class: 'ro-val', text: '—' });
-  panel.appendChild(section('COLLISIONS',
+  panel.appendChild(section('Collisions',
     collModeRow,
     restS.row,
-    el('div', { class: 'ro-sub', text: 'last impact' }),
+    el('div', { class: 'ro-sub', text: 'Last impact' }),
     el('div', { class: 'ro-grid' }, [
-      el('span', { class: 'ro-label', text: 'class', 'data-tip': 'Impact severity: MERGE (would gently accrete), DISRUPTION (a violent graze), or CATASTROPHIC (a body-shattering smash).' }), impClass,
-      el('span', { class: 'ro-label', text: 'bodies', 'data-tip': 'The two bodies involved in the most recent impact.' }), impPair,
-      el('span', { class: 'ro-label', text: 'rel speed', 'data-tip': 'Relative speed of the two bodies at the moment of contact.' }), impSpeed,
-      el('span', { class: 'ro-label', text: 'impact E', 'data-tip': 'Kinetic energy of the relative motion at contact (½·μ·v²) — the energy available to do damage.' }), impEnergy,
-      el('span', { class: 'ro-label', text: 'vs binding', 'data-tip': 'Impact energy as a multiple of the merged body’s gravitational binding energy. Above ~1 it can disrupt; above ~10 it shatters.' }), impSeverity,
+      el('span', { class: 'ro-label', text: 'Class', 'data-tip': 'Impact severity: MERGE (would gently accrete), DISRUPTION (a violent graze), or CATASTROPHIC (a body-shattering smash).' }), impClass,
+      el('span', { class: 'ro-label', text: 'Bodies', 'data-tip': 'The two bodies involved in the most recent impact.' }), impPair,
+      el('span', { class: 'ro-label', text: 'Rel speed', 'data-tip': 'Relative speed of the two bodies at the moment of contact.' }), impSpeed,
+      el('span', { class: 'ro-label', text: 'Impact E', 'data-tip': 'Kinetic energy of the relative motion at contact (½·μ·v²) — the energy available to do damage.' }), impEnergy,
+      el('span', { class: 'ro-label', text: 'Vs binding', 'data-tip': 'Impact energy as a multiple of the merged body’s gravitational binding energy. Above ~1 it can disrupt; above ~10 it shatters.' }), impSeverity,
     ])
   ));
 
@@ -390,27 +408,74 @@ export function createUI(app) {
     return t.node;
   };
   panel.appendChild(
-    section('DISPLAY',
+    section('Display',
       el('div', { class: 'tgl-grid' }, [
-        tgl('grid', 'showGrid', 'Show/hide the background reference grid (G)'),
-        tgl('center-of-mass', 'showCOM', "Show/hide the blue crosshair at the system's center of mass"),
-        tgl('trails', 'showTrails', 'Show/hide the fading orbital trails (T)'),
-        tgl('velocity', 'showVectors', "Show/hide arrows for each body's velocity — direction & speed (V)"),
-        tgl('z-height', 'showZLines', 'Show/hide vertical drop lines from each body to the xy plane — reveals height above/below the grid (Z)'),
+        tgl('Grid', 'showGrid', 'Show/hide the background reference grid (G)'),
+        tgl('Center of mass', 'showCOM', "Show/hide the crosshair at the system's center of mass"),
+        tgl('Trails', 'showTrails', 'Show/hide the fading orbital trails (T)'),
+        tgl('Velocity', 'showVectors', "Show/hide arrows for each body's velocity — direction & speed (V)"),
+        tgl('Stars', 'showStars', 'Show/hide the background star field (B)'),
+        tgl('Z-height', 'showZLines', 'Show/hide vertical drop lines from each body to the xy plane — reveals height above/below the grid (Z)'),
       ])
     )
   );
 
+  // ---------- UI style ----------
+  // Purely cosmetic: swaps the CSS skin and the 3D scene's look (app.setTheme).
+  const themeBtns = {};
+  const themeRow = el('div', { class: 'btn-grid span-first' });
+  for (const id of themeOrder) {
+    const b = button(THEMES[id].label, () => app.setTheme(id), '', THEMES[id].tip);
+    themeBtns[id] = b;
+    themeRow.appendChild(b);
+  }
+  panel.appendChild(section('UI Style', themeRow));
+
   // ---------- camera ----------
+  // The camera locks onto something (the center of mass or one body) and travels with it, or
+  // stays free. A locked body can also be viewed from its own surface. The hint line under the
+  // buttons always spells out what the current choice does and how to drive it.
+  const camBtns = {};
+  const camBtn = (key, label, tip, onclick) => {
+    camBtns[key] = button(label, onclick, '', tip);
+    return camBtns[key];
+  };
+  const bodyName = (i) => `Body ${'ABC'[i]}`;
+  const camTop = el('div', { class: 'btn-grid' }, [
+    camBtn('free', 'Free', 'Camera stays where you put it. Drag to orbit, scroll to zoom, right-drag to pan. (0)', () => app.setCameraFocus('free')),
+    camBtn('com', 'Center of Mass', 'Lock onto the center of mass and travel with it. Drag to orbit around it, scroll to zoom. (4)', () => app.setCameraFocus('com')),
+  ]);
+  const camBodies = el('div', { class: 'btn-grid three cam-row' }, [0, 1, 2].map((i) =>
+    camBtn(`body${i}`, bodyName(i), `Lock onto ${bodyName(i)} and travel with it. Drag to orbit around it, scroll to zoom. (${i + 1})`, () => app.setCameraFocus(i))
+  ));
+  const spotBtn = button('⚄ New Spot', () => app.newSurfaceSpot(), '', 'Jump to a different random spot on the same body’s surface');
+  const camView = el('div', { class: 'cam-opts hidden' }, [
+    el('div', { class: 'ro-sub', text: 'View from' }),
+    el('div', { class: 'btn-grid' }, [
+      camBtn('orbit', 'Orbit', 'Orbit around the body, looking at it from outside', () => app.setCameraView('orbit')),
+      camBtn('surface', 'Surface', 'Stand on the body’s surface at a random spot and look out at the rest of the sim. Drag to look around. (P)', () => app.setCameraView('surface')),
+    ]),
+    el('div', { class: 'cam-spot hidden' }, [spotBtn]),
+  ]);
+  const camHint = el('div', { class: 'cam-hint' });
+  const camSpot = camView.querySelector('.cam-spot');
   panel.appendChild(
-    section('CAMERA',
-      el('div', { class: 'tgl-grid' }, [
-        tgl('follow COM', 'followCOM', 'Stay put but keep aiming at the center of mass as the system drifts. Combine with track COM.'),
-        tgl('track COM', 'trackCOM', "Travel with the center of mass at the distance locked in when switched on — a tracking/dolly shot. Combine with follow COM."),
-      ]),
-      el('div', { class: 'btn-row' }, [button('⛶ FRAME ALL', () => app.frameAll(), '', 'Move the camera to fit all bodies in view (F)')])
+    section('Camera',
+      el('div', { class: 'ro-sub first', text: 'Focus' }),
+      camTop,
+      camBodies,
+      camView,
+      camHint,
+      el('div', { class: 'btn-row' }, [button('⛶ Frame All', () => app.frameAll(), '', 'Move the camera to fit all bodies in view (F)')])
     )
   );
+
+  function describeCamera({ focus, view }) {
+    if (focus === 'free') return 'Free camera. Drag to orbit, scroll to zoom, right-drag to pan.';
+    const what = focus === 'com' ? 'the center of mass' : bodyName(focus);
+    if (view === 'surface') return `Riding the surface of ${what}: you turn as it spins. Starts looking straight up; drag to look around, New Spot moves you.`;
+    return `Locked on ${what}. The camera travels with it. Drag to orbit, scroll to zoom.`;
+  }
 
   // ---------- readouts ----------
   const keEl = el('span', { class: 'ro-val', text: '0.00' });
@@ -421,8 +486,9 @@ export function createUI(app) {
   const bodyBars = [];
   const barsWrap = el('div', { class: 'bars' });
   for (let i = 0; i < 3; i++) {
-    const fill = el('span', { class: 'bar-fill', style: `background:${hex(COLORS[i])}` });
-    const val = el('span', { class: 'bar-val', text: '0.00' });
+    // data-body lets a monochrome style tell A/B/C apart by pattern instead of colour
+    const fill = el('span', { class: 'bar-fill', 'data-body': i, style: `background:${hex(COLORS[i])}` });
+    const val = el('span', { class: 'bar-val caps', text: '0.00' });
     bodyBars.push({ fill, val });
     barsWrap.appendChild(
       el('div', { class: 'bar-row' }, [
@@ -433,15 +499,15 @@ export function createUI(app) {
     );
   }
   panel.appendChild(
-    section('TELEMETRY',
+    section('Telemetry',
       el('div', { class: 'ro-grid' }, [
-        el('span', { class: 'ro-label', text: 'kinetic', 'data-tip': 'Total kinetic energy (energy of motion). Rises as bodies speed up.' }), keEl,
-        el('span', { class: 'ro-label', text: 'potential', 'data-tip': 'Total gravitational potential energy. More negative when bodies are closer.' }), peEl,
-        el('span', { class: 'ro-label', text: 'total', 'data-tip': 'Kinetic + potential. Should stay nearly constant — the integrator conserves energy.' }), energyEl,
-        el('span', { class: 'ro-label', text: 'drift', 'data-tip': 'How far total energy has strayed from its start. Tiny = faithful; grows on violent close passes.' }), driftEl,
-        el('span', { class: 'ro-label', text: 'min sep', 'data-tip': 'Closest center-to-center distance between any two bodies right now.' }), sepEl,
+        el('span', { class: 'ro-label', text: 'Kinetic', 'data-tip': 'Total kinetic energy (energy of motion). Rises as bodies speed up.' }), keEl,
+        el('span', { class: 'ro-label', text: 'Potential', 'data-tip': 'Total gravitational potential energy. More negative when bodies are closer.' }), peEl,
+        el('span', { class: 'ro-label', text: 'Total', 'data-tip': 'Kinetic + potential. Should stay nearly constant — the integrator conserves energy.' }), energyEl,
+        el('span', { class: 'ro-label', text: 'Drift', 'data-tip': 'How far total energy has strayed from its start. Tiny = faithful; grows on violent close passes.' }), driftEl,
+        el('span', { class: 'ro-label', text: 'Min sep', 'data-tip': 'Closest center-to-center distance between any two bodies right now.' }), sepEl,
       ]),
-      el('div', { class: 'ro-sub', text: 'body speed' }),
+      el('div', { class: 'ro-sub', text: 'Body speed' }),
       barsWrap
     )
   );
@@ -461,23 +527,49 @@ export function createUI(app) {
       case 'g': app.toggleOption('showGrid'); break;
       case 'v': app.toggleOption('showVectors'); break;
       case 'z': app.toggleOption('showZLines'); break;
+      case 'b': app.toggleOption('showStars'); break;
       case 'c': app.cycleCollisionMode(); break;
+      case 'u': app.cycleTheme(); break;
+      case '0': app.setCameraFocus('free'); break;
+      case '1': case '2': case '3': app.setCameraFocus(Number(e.key) - 1); break;
+      case '4': app.setCameraFocus('com'); break;
+      case 'p': app.toggleSurface(); break;
       case 'escape': app.deselect(); popover.classList.add('hidden'); break;
     }
   });
 
   // ---------- API back to main ----------
   let maxSpeed = 1;
+  let lastRunning = null;
   return {
     setActivePreset(id) {
       for (const [k, b] of Object.entries(presetBtns)) b.classList.toggle('active', k === id);
+      // the scene window of a windowed style is titled like a document
+      if (sceneTitle) sceneTitle.textContent = presets[id] ? presets[id].label : 'Custom';
+    },
+    setTheme(id) {
+      for (const [k, b] of Object.entries(themeBtns)) b.classList.toggle('active', k === id);
+    },
+    setCamera(cam) {
+      const isBody = Number.isInteger(cam.focus);
+      for (const [k, b] of Object.entries(camBtns)) {
+        const on = k === 'free' ? cam.focus === 'free'
+          : k === 'com' ? cam.focus === 'com'
+          : k === 'orbit' ? isBody && cam.view === 'orbit'
+          : k === 'surface' ? isBody && cam.view === 'surface'
+          : cam.focus === Number(k.slice(4)); // body0..body2
+        b.classList.toggle('active', on);
+      }
+      camView.classList.toggle('hidden', !isBody);
+      camSpot.classList.toggle('hidden', cam.view !== 'surface');
+      camHint.textContent = describeCamera(cam);
     },
     setCollisionMode(m) {
       for (const [k, b] of Object.entries(collModeBtns)) b.classList.toggle('active', k === m);
     },
     showBodyEditor(i, cfg) {
       editIndex = i;
-      editTitle.innerHTML = `<span class="swatch" style="background:${hex(COLORS[i])}"></span>BODY ${'ABC'[i]}`;
+      editTitle.innerHTML = `<span class="swatch" data-body="${i}" style="background:${hex(COLORS[i])}"></span>Body ${'ABC'[i]}`;
       editSel.mass.set(cfg.mass); editSel.radius.set(cfg.radius);
       editSel.px.set(cfg.pos.x); editSel.py.set(cfg.pos.y); editSel.pz.set(cfg.pos.z);
       editSel.vx.set(cfg.vel.x); editSel.vy.set(cfg.vel.y); editSel.vz.set(cfg.vel.z);
@@ -502,9 +594,12 @@ export function createUI(app) {
     },
     update() {
       const r = app.getReadouts();
-      statusPill.textContent = r.running ? 'RUNNING' : 'PAUSED';
+      statusPill.textContent = r.running ? 'Running' : 'Paused';
       statusPill.classList.toggle('on', r.running);
-      playBtn.textContent = r.running ? '⏸ PAUSE' : '▶ START';
+      if (r.running !== lastRunning) {
+        lastRunning = r.running;
+        setButtonLabel(playBtn, r.running ? '⏸ Pause' : '▶ Start');
+      }
       fpsEl.textContent = 'FPS ' + r.fps.toFixed(0);
       timeEl.textContent = 'T ' + r.time.toFixed(1);
       keEl.textContent = r.ke.toFixed(3);
@@ -517,13 +612,13 @@ export function createUI(app) {
       for (let i = 0; i < bodyBars.length; i++) {
         const sp = r.speeds[i] ?? 0;
         bodyBars[i].fill.style.width = Math.min(100, (sp / maxSpeed) * 100) + '%';
-        bodyBars[i].val.textContent = r.ejected[i] ? 'EJECT' : sp.toFixed(2);
+        bodyBars[i].val.textContent = r.ejected[i] ? 'Eject' : sp.toFixed(2);
       }
 
       const li = r.lastImpact;
       if (li) {
-        impClass.textContent = li.category.toUpperCase();
-        impClass.style.color = CLASS_COLOR[li.category] || '';
+        impClass.textContent = li.category;
+        impClass.dataset.sev = li.category;
         impPair.textContent = `${li.a} ✕ ${li.b}`;
         impSpeed.textContent = li.vRel.toFixed(2);
         impEnergy.textContent = li.impactEnergy.toFixed(2);
@@ -531,7 +626,7 @@ export function createUI(app) {
       } else {
         impClass.textContent = impPair.textContent = '—';
         impSpeed.textContent = impEnergy.textContent = impSeverity.textContent = '—';
-        impClass.style.color = '';
+        delete impClass.dataset.sev;
       }
     },
   };
