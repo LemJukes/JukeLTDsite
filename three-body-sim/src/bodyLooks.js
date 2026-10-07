@@ -470,8 +470,9 @@ function comet(ctx) {
 
   const ionColor = kit.accent(0x7fc8ff, color);
   const dustColor = kit.accent(0xffd27a, color, 0.45);
-  const ion = kit.fadingLines(1, ION_POINTS, ionColor, 1.3);
-  const dust = kit.fadingLines(DUST_LINES, DUST_POINTS, dustColor, 1.0);
+  // (ink fades by display brightness, so a 1-bit tail needs a slower fade to stay a line, not dots)
+  const ion = kit.fadingLines(1, ION_POINTS, ionColor, kit.additive ? 1.3 : 0.4);
+  const dust = kit.fadingLines(DUST_LINES, DUST_POINTS, dustColor, kit.additive ? 1.0 : 0.6);
   const tails = new THREE.Group();
   tails.add(dust.object, ion.object);
 
