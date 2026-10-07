@@ -142,17 +142,21 @@ function popupMenu(label, options, value, onchange, tip) {
   };
   const scroller = document.getElementById('panel-body'); // the list closes if the panel scrolls under it
   const onOutside = (e) => { if (!list.contains(e.target) && !trigger.contains(e.target)) close(false); };
-  const onScroll = () => close(false);
+  let openedAt = 0; // panel scroll position when the list opened
+  const onResize = () => close(false);
+  // (a late scroll event from whatever scrolled the button into view must not close it: only a real move does)
+  const onScroll = () => { if (scroller.scrollTop !== openedAt) close(false); };
   function open() {
     if (isOpen) return;
     isOpen = true;
+    openedAt = scroller.scrollTop;
     list.classList.remove('hidden');
     place();
     highlight(current);
     trigger.setAttribute('aria-expanded', 'true');
     list.focus({ preventScroll: true });
     document.addEventListener('pointerdown', onOutside, true);
-    window.addEventListener('resize', onScroll);
+    window.addEventListener('resize', onResize);
     scroller.addEventListener('scroll', onScroll);
   }
   function close(refocus = true) {
@@ -161,7 +165,7 @@ function popupMenu(label, options, value, onchange, tip) {
     list.classList.add('hidden');
     trigger.setAttribute('aria-expanded', 'false');
     document.removeEventListener('pointerdown', onOutside, true);
-    window.removeEventListener('resize', onScroll);
+    window.removeEventListener('resize', onResize);
     scroller.removeEventListener('scroll', onScroll);
     if (refocus) trigger.focus({ preventScroll: true });
   }
@@ -482,11 +486,17 @@ export function createUI(app) {
   const objectM = popupMenu('Object', lookOrder.map((id) => ({ id, label: LOOKS[id].label, tip: LOOKS[id].tip })), 'body',
     (id) => app.setLook(editIndex, { object: id }),
     'What this body looks like. Purely cosmetic: its mass, size and gravity do not change.');
+  const MOON_TIP = 'Add small decorative moons on tilted orbits round this body. Purely cosmetic: no gravity, no collisions.';
+  const moonT = toggle('Moonlets', false, (v) => app.setLook(editIndex, { moonlets: v }), MOON_TIP);
+  const moonS = slider('Moonlet count', { min: 1, max: 4, step: 1, value: 2, format: (v) => String(v), tip: MOON_TIP },
+    (v) => app.setLook(editIndex, { moonletCount: v }));
   const lookBox = el('div', { class: 'custom-body look-box' }, [
     el('div', { class: 'custom-body-title', text: 'Look' }),
     objectM.row,
     shapeS.row,
     diceT.node,
+    moonT.node,
+    moonS.row,
   ]);
 
   // Show the selected body's look in the controls, greying out what does not apply to it.
@@ -508,6 +518,13 @@ export function createUI(app) {
     diceT.node.setAttribute('data-tip', diceOk ? DICE_TIP
       : hasShape && !def.noDice ? 'Dice faces need a flat-faced shape: tetrahedron through icosahedron.'
         : `The ${def.label} look has no flat faces to number.`);
+
+    // moonlets work with any look; the count only applies while they are on
+    moonT.input.checked = !!look.moonlets;
+    moonS.set(look.moonletCount);
+    moonS.input.disabled = !look.moonlets;
+    moonS.row.classList.toggle('disabled', !look.moonlets);
+    moonS.row.setAttribute('data-tip', look.moonlets ? MOON_TIP : 'Turn Moonlets on to choose how many.');
   }
 
   const editorHead = el('div', { class: 'section-title' }, [

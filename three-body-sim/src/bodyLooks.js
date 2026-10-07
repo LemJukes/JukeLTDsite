@@ -35,8 +35,9 @@
 
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { TeapotGeometry } from 'three/addons/geometries/TeapotGeometry.js';
 import { SHAPE_DEFAULT, DICE_MAX, HULL_FROM, stopFor, buildShapeGeometry, diceSegments } from './shapes.js';
-import { fbm3 } from './noise.js';
+import { fbm3, valueNoise3, mulberry32 } from './noise.js';
 
 // ---- settings ---------------------------------------------------------------
 
@@ -580,6 +581,203 @@ function ringedPlanet(ctx) {
   return { core, decorations: rings };
 }
 
+// ---- atom -------------------------------------------------------------------
+
+const NUCLEON = 1 / 3;                       // nucleon radius: a centre ball + six around it fill the unit sphere
+const ELECTRON_RATES = [2.4, 1.7, 1.1];      // rad/s on the spin clock
+const ORBIT_SEMI_MAJOR = [2.0, 2.45, 2.9];   // in body radii
+const ORBIT_ECCENTRICITY = 0.55;
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+function atom(ctx) {
+  const { kit, tracker, color, seed, settings } = ctx;
+
+  // nucleus: seven balls (one in the middle, six round it) in a seeded random turn. The Shape slider
+  // picks what a nucleon is made of; tiny balls cannot carry an outline, so they stay wireframes.
+  const stop = stopFor(Math.min(settings.shape, 70));
+  const ball = kit.geometry(`shape:${stop.value}`, () => buildShapeGeometry(stop.value));
+  const nucleus = new THREE.Group();
+  const spots = [[0, 0, 0], [2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]];
+  for (const [x, y, z] of spots) {
+    const n = stop.value <= DICE_MAX ? kit.edges(ball, color) : kit.wire(ball, color);
+    n.position.set(x, y, z).multiplyScalar(NUCLEON);
+    n.scale.setScalar(NUCLEON);
+    nucleus.add(n);
+  }
+  const rand = mulberry32(seed * 977 + 13);
+  nucleus.quaternion.setFromEuler(new THREE.Euler(rand() * 6.28, rand() * 6.28, rand() * 6.28));
+
+  // three tilted elliptical orbits, each with an electron going round at its own rate
+  const orbits = new THREE.Group();
+  const orbitColor = kit.accent(0x7fd0ff, color, 0.1);
+  const electronColor = kit.hot(kit.accent(0x9fe0ff, color));
+  const dot = kit.geometry('shape:50', () => buildShapeGeometry(50));
+  const SEG = 72;
+  const electrons = ORBIT_SEMI_MAJOR.map((a, i) => {
+    const b = a * Math.sqrt(1 - ORBIT_ECCENTRICITY ** 2);
+    const c = a * ORBIT_ECCENTRICITY;                           // the nucleus sits at a focus
+    const loop = new Float32Array(SEG * 6);
+    for (let k = 0; k < SEG; k++) {
+      for (const [j, t] of [[0, k], [1, k + 1]]) {
+        const ang = (t / SEG) * Math.PI * 2;
+        loop.set([a * Math.cos(ang) - c, b * Math.sin(ang), 0], k * 6 + j * 3);
+      }
+    }
+    const plane = new THREE.Group();                             // tilted, then turned about the polar axis
+    plane.quaternion.setFromEuler(new THREE.Euler(1.15, 0, (i * Math.PI) / 3 + seed * 0.7, 'ZXY'));
+    plane.add(kit.lines(loop, orbitColor));
+    const electron = kit.edges(dot, electronColor);
+    electron.scale.setScalar(0.13);
+    plane.add(electron);
+    orbits.add(plane);
+    return { electron, a, b, c, angle: rand() * Math.PI * 2, rate: ELECTRON_RATES[i] };
+  });
+  return {
+    core: nucleus,
+    decorations: orbits,
+    update(dt) {
+      for (const e of electrons) {
+        e.angle += e.rate * dt;
+        e.electron.position.set(e.a * Math.cos(e.angle) - e.c, e.b * Math.sin(e.angle), 0);
+      }
+    },
+  };
+}
+
+// ---- fruit and teapot: one object, normalised to the unit sphere -------------
+
+// Centre `object` on its bounding box, scale it so the farthest point sits at radius 1, and turn it so
+// its own up (+y) is the spin axis, so it spins upright like a real fruit on its stem. `object` must not
+// be in a scene yet.
+function uprightUnit(object, spinAxis) {
+  object.updateMatrixWorld(true);
+  const centre = new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+  const v = new THREE.Vector3();
+  let max = 0;
+  object.traverse((o) => {
+    const pos = o.geometry && o.geometry.attributes && o.geometry.attributes.position;
+    if (!pos) return;
+    for (let i = 0; i < pos.count; i++) max = Math.max(max, v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).sub(centre).length());
+  });
+  const inner = new THREE.Group();
+  inner.scale.setScalar(1 / max);
+  inner.position.copy(centre).multiplyScalar(-1 / max);
+  inner.add(object);
+  const outer = new THREE.Group();
+  outer.quaternion.setFromUnitVectors(Y_AXIS, spinAxis.clone().normalize());
+  outer.add(inner);
+  return outer;
+}
+
+// quadratic Bezier from p0 to p2 via p1, as `n` line segments (flat xyz pairs)
+function bezier(p0, p1, p2, n = 16) {
+  const at = (t) => [0, 1, 2].map((i) => (1 - t) ** 2 * p0[i] + 2 * (1 - t) * t * p1[i] + t * t * p2[i]);
+  const out = [];
+  for (let k = 0; k < n; k++) out.push(...at(k / n), ...at((k + 1) / n));
+  return out;
+}
+
+function cherry({ kit, color, spinAxis }) {
+  const ball = kit.geometry('shape:60', () => buildShapeGeometry(60));
+  const group = new THREE.Group();
+  const stems = [];
+  for (const side of [-1, 1]) {
+    const fruit = kit.wire(ball, color);
+    fruit.scale.setScalar(0.42);
+    fruit.position.set(side * 0.5, -0.5, 0);
+    group.add(fruit);
+    // each stem leaves the top of its cherry, arcs inward and meets the other at the top
+    stems.push(...bezier([side * 0.5, -0.08, 0], [side * 0.5, 0.55, 0], [0, 0.95, 0]));
+  }
+  group.add(kit.lines(new Float32Array(stems), kit.accent(0xb6ff7a, color)));
+  return { core: uprightUnit(group, spinAxis) };
+}
+
+function orange(ctx) {
+  const { kit, color, seed, spinAxis } = ctx;
+  const group = new THREE.Group();
+  // dimpled skin: the shape pitted by high-frequency noise; its own up is +y, which the stem sits on
+  const dimples = {
+    key: `orange:${seed}`,
+    apply: (base) => reshape(base, (v) => {
+      const n = valueNoise3(v.x * 5.5 + seed * 3.1, v.y * 5.5, v.z * 5.5, seed + 7);
+      v.multiplyScalar(1 - 0.17 * n * n);
+    }),
+  };
+  group.add(roundCore({ ...ctx, spinAxis: Y_AXIS }, dimples));
+  const nub = kit.edges(kit.geometry('orange:nub', () => new THREE.CylinderGeometry(0.1, 0.16, 0.24, 7)), kit.accent(0xb6ff7a, color));
+  nub.position.set(0, 1.02, 0);
+  group.add(nub);
+  return { core: uprightUnit(group, spinAxis) };
+}
+
+function grape({ kit, color, seed, spinAxis }) {
+  const ball = kit.geometry('shape:50', () => buildShapeGeometry(50)); // fifteen balls: plain icosahedra, so 1-bit lines do not clot
+  const rand = mulberry32(seed * 313 + 5);
+  const group = new THREE.Group();
+  // a tapering bunch: layers of 5, 4, 3, 2 and 1 grapes, each ring narrower than the one above
+  for (let layer = 0; layer < 5; layer++) {
+    const count = 5 - layer;
+    const ringR = count === 1 ? 0 : 0.5 - layer * 0.1;
+    for (let k = 0; k < count; k++) {
+      const a = (k / count) * Math.PI * 2 + layer * 0.7 + rand() * 0.3;
+      const g = kit.edges(ball, color);
+      g.scale.setScalar(0.21);
+      g.position.set(ringR * Math.cos(a), 0.55 - layer * 0.36 + (rand() - 0.5) * 0.05, ringR * Math.sin(a));
+      group.add(g);
+    }
+  }
+  group.add(kit.lines(new Float32Array(bezier([0, 0.7, 0], [0.02, 1.05, 0], [0.18, 1.3, 0.05], 8)), kit.accent(0xb6ff7a, color)));
+  return { core: uprightUnit(group, spinAxis) };
+}
+
+function teapot({ kit, color, spinAxis }) {
+  const geometry = kit.geometry('teapot', () => new TeapotGeometry(1, 3, true, true, true, true, true));
+  return { core: uprightUnit(kit.wire(geometry, color), spinAxis) };
+}
+
+// ---- moonlets: small decorative satellites, on top of any look ----------------
+
+// 1-4 little wire balls on fixed circular orbits at different tilts and rates, advanced by the spin
+// clock. Purely decorative: no physics, never picked, and out of the way of framing, trails and
+// collisions (which only look at the body's own radius).
+function moonlets(kit, color, count, seed) {
+  const group = new THREE.Group();
+  const ball = kit.geometry('shape:50', () => buildShapeGeometry(50));
+  const rand = mulberry32(seed * 7919 + 3);
+  const ringColor = kit.accent(0x7fd0ff, color, 0.2);
+  const SEG = 64;
+  const moons = [];
+  for (let i = 0; i < count; i++) {
+    const radius = 1.9 + 0.55 * i;
+    const plane = new THREE.Group();
+    // each orbit tilted a different way (golden-angle spread of the plane's turn about the polar axis)
+    plane.quaternion.setFromEuler(new THREE.Euler((20 + 38 * i) * (Math.PI / 180), 0, i * 2.39996 + seed, 'ZXY'));
+    const ring = new Float32Array(SEG * 6);
+    for (let k = 0; k < SEG; k++) {
+      for (const [j, t] of [[0, k], [1, k + 1]]) {
+        ring.set([radius * Math.cos((t / SEG) * Math.PI * 2), radius * Math.sin((t / SEG) * Math.PI * 2), 0], k * 6 + j * 3);
+      }
+    }
+    plane.add(kit.lines(ring, ringColor));
+    const moon = kit.edges(ball, color);
+    moon.scale.setScalar(0.13 + 0.03 * ((i * 5) % 3));
+    plane.add(moon);
+    group.add(plane);
+    // Kepler-ish: the farther out, the slower; alternate moons go round the other way
+    moons.push({ moon, radius, angle: rand() * Math.PI * 2, rate: ((i % 2 ? -1 : 1) * (1 + 0.2 * i)) / radius ** 1.5 });
+  }
+  return {
+    group,
+    update(dt) {
+      for (const m of moons) {
+        m.angle += m.rate * dt;
+        m.moon.position.set(m.radius * Math.cos(m.angle), m.radius * Math.sin(m.angle), 0);
+      }
+    },
+  };
+}
+
 // ---- black hole -------------------------------------------------------------
 
 const DISK_INNER = 1.45;   // accretion disk, in units of the horizon radius
@@ -721,6 +919,48 @@ export const LOOKS = {
     usesDetail: true,
     build: ringedPlanet,
   },
+
+  atom: {
+    id: 'atom',
+    label: 'Atom',
+    tip: 'A nucleus of seven balls with three tilted elliptical orbits, an electron racing round each',
+    usesDetail: true,
+    noDice: true,
+    build: atom,
+  },
+
+  cherry: {
+    id: 'cherry',
+    label: 'Cherry',
+    tip: 'Two cherries on curved stems joined at the top',
+    usesDetail: false,
+    build: cherry,
+  },
+
+  orange: {
+    id: 'orange',
+    label: 'Orange',
+    tip: 'A dimpled round fruit with a stem nub',
+    usesDetail: true,
+    noDice: true,
+    build: orange,
+  },
+
+  grape: {
+    id: 'grape',
+    label: 'Grapes',
+    tip: 'A tapering bunch of fifteen grapes on a stem',
+    usesDetail: false,
+    build: grape,
+  },
+
+  teapot: {
+    id: 'teapot',
+    label: 'Teapot',
+    tip: 'The Utah teapot, spinning upright',
+    usesDetail: false,
+    build: teapot,
+  },
 };
 
 export const lookOrder = Object.keys(LOOKS);
@@ -757,11 +997,25 @@ export function createLook(settings, { theme, color, index, spinAxis }) {
   const tracker = makeTracker();
   const kit = makeKit(theme, tracker);
   const built = def.build({ kit, tracker, color, index, seed: index, spinAxis, settings, theme });
+
+  // Moonlets work with any look: they join its decorations and ride its update.
+  let decorations = built.decorations || null;
+  let update = built.update || null;
+  if (settings.moonlets) {
+    const m = moonlets(kit, color, settings.moonletCount, index);
+    const all = new THREE.Group();        // (its own frame, so a look's tilted decorations do not tilt the moons)
+    if (decorations) all.add(decorations);
+    all.add(m.group);
+    decorations = all;
+    const own = update;
+    update = (dt, ctx) => { if (own) own(dt, ctx); m.update(dt); };
+  }
+
   return {
     def,
     core: built.core,
-    decorations: built.decorations || null,
-    update: built.update || null,
+    decorations,
+    update,
     // parts of the decorations that are not drawn while the camera stands on this body (things that
     // start at its centre: tails, beams, field lines)
     rideHidden: built.rideHidden || [],
