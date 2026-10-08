@@ -44,6 +44,8 @@
 //               velocity arrows and z-height lines
 //   notes       true = hand-written annotations are drawn over the scene as an SVG overlay (notes.js)
 //   fx          'scribble' = collisions are a red scribbled starburst plus a short note, not a glowing burst
+//   gridDefault false = the 3D reference grid starts switched off in this style (the paper already is a
+//               grid); the Grid toggle / G key still turns it on. Absent = on, like the other styles.
 
 // Shared by 'mac' and 'mac-dark': the same 1-bit frame, which the dark style inverts with CSS.
 const MAC_SCENE = {
@@ -141,11 +143,13 @@ export const THEMES = {
       annot: 0xc4262e,            // red ballpoint
       notes: true,
       fx: 'scribble',
+      gridDefault: false,
     },
   },
 };
 
-export const themeOrder = ['crt', 'mac', 'mac-dark', 'notebook'];
+// Also the order of the UI Style buttons (two columns) and of the U key: the two Mac styles stay side by side.
+export const themeOrder = ['crt', 'notebook', 'mac', 'mac-dark'];
 export const DEFAULT_THEME = 'crt';
 
 // Must match the key read by the inline script in index.html's <head>, which

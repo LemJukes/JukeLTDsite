@@ -614,53 +614,64 @@ function ringedPlanet(ctx) {
 // ---- atom -------------------------------------------------------------------
 
 const NUCLEON = 1 / 3;                       // nucleon radius: a centre ball + six around it fill the unit sphere
-const ELECTRON_RATES = [2.4, 1.7, 1.1];      // rad/s on the spin clock
-const ORBIT_SEMI_MAJOR = [2.0, 2.45, 2.9];   // in body radii
-const ORBIT_ECCENTRICITY = 0.55;
+// The atom as it is drawn in a textbook: a small cluster of protons and neutrons at the middle of three
+// identical slim orbits that cross like a gyroscope, an electron racing round each with ghosts fading behind it.
+const ORBIT_A = 2.4;                         // orbit semi-major axis, in body radii
+const ORBIT_B = 0.95;                        // semi-minor axis: slim, so the three loops read as an atom
+const ORBIT_LEAN = 0.87;                     // how far each orbit plane leans (50 degrees) off the plane through the shared axis
+const ELECTRON_RATE = 2.1;                   // rad/s on the spin clock; each electron differs a little so they never lock step
+// [how far behind (radians of orbit), size, brightness where light adds up]: the electron, then its ghosts
+const ELECTRON_TRAIL = [[0, 0.14, 1], [0.3, 0.09, 0.5], [0.6, 0.06, 0.25], [0.9, 0.04, 0.12]];
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 function atom(ctx) {
-  const { kit, tracker, color, seed, settings } = ctx;
+  const { kit, tracker, color, seed, spinAxis, settings } = ctx;
 
-  // nucleus: seven balls (one in the middle, six round it) in a seeded random turn. The Shape slider
-  // picks what a nucleon is made of; tiny balls cannot carry an outline, so they stay wireframes.
+  // nucleus: seven balls (one in the middle, six round it) in a seeded random turn, protons in red and
+  // neutrons in the body's own colour (one ink in the ink styles). The Shape slider picks what a nucleon
+  // is made of; tiny balls cannot carry an outline, so they stay wireframes.
   const stop = stopFor(Math.min(settings.shape, 70));
   const ball = kit.geometry(`shape:${stop.value}`, () => buildShapeGeometry(stop.value));
+  const proton = kit.accent(0xff6a5a, color);
   const nucleus = new THREE.Group();
   const spots = [[0, 0, 0], [2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]];
-  for (const [x, y, z] of spots) {
-    const n = stop.value <= DICE_MAX ? kit.edges(ball, color) : kit.wire(ball, color);
+  spots.forEach(([x, y, z], i) => {
+    const ink = i % 2 ? proton : color;
+    const n = stop.value <= DICE_MAX ? kit.edges(ball, ink) : kit.wire(ball, ink);
     n.position.set(x, y, z).multiplyScalar(NUCLEON);
     n.scale.setScalar(NUCLEON);
     nucleus.add(n);
-  }
+  });
   const rand = mulberry32(seed * 977 + 13);
   nucleus.quaternion.setFromEuler(new THREE.Euler(rand() * 6.28, rand() * 6.28, rand() * 6.28));
 
-  // three tilted elliptical orbits, each with an electron going round at its own rate
+  // three orbits, each turned 60 degrees about the spin axis from the last, with an electron and its streak
   const orbits = new THREE.Group();
-  const orbitColor = kit.accent(0x7fd0ff, color, 0.1);
+  orbits.quaternion.setFromUnitVectors(Z_AXIS, spinAxis.clone().normalize());
+  // where light adds up the orbit is dimmed, so the bright electron and its fading ghosts show against it
+  const orbitColor = kit.additive ? new THREE.Color(0x7fd0ff).multiplyScalar(0.4) : kit.accent(0x7fd0ff, color, 0.1);
   const electronColor = kit.hot(kit.accent(0x9fe0ff, color));
   const dot = kit.geometry('shape:50', () => buildShapeGeometry(50));
-  const SEG = 72;
-  const electrons = ORBIT_SEMI_MAJOR.map((a, i) => {
-    const b = a * Math.sqrt(1 - ORBIT_ECCENTRICITY ** 2);
-    const c = a * ORBIT_ECCENTRICITY;                           // the nucleus sits at a focus
-    const loop = new Float32Array(SEG * 6);
-    for (let k = 0; k < SEG; k++) {
-      for (const [j, t] of [[0, k], [1, k + 1]]) {
-        const ang = (t / SEG) * Math.PI * 2;
-        loop.set([a * Math.cos(ang) - c, b * Math.sin(ang), 0], k * 6 + j * 3);
-      }
+  const SEG = 96;
+  const loop = new Float32Array(SEG * 6);
+  for (let k = 0; k < SEG; k++) {
+    for (const [j, t] of [[0, k], [1, k + 1]]) {
+      const ang = (t / SEG) * Math.PI * 2;
+      loop.set([ORBIT_A * Math.cos(ang), ORBIT_B * Math.sin(ang), 0], k * 6 + j * 3);
     }
-    const plane = new THREE.Group();                             // tilted, then turned about the polar axis
-    plane.quaternion.setFromEuler(new THREE.Euler(1.15, 0, (i * Math.PI) / 3 + seed * 0.7, 'ZXY'));
+  }
+  const electrons = [0, 1, 2].map((i) => {
+    const plane = new THREE.Group();                             // leaned, then turned about the shared axis
+    plane.quaternion.setFromEuler(new THREE.Euler(ORBIT_LEAN, 0, (i * Math.PI) / 3 + seed * 0.7, 'ZXY'));
     plane.add(kit.lines(loop, orbitColor));
-    const electron = kit.edges(dot, electronColor);
-    electron.scale.setScalar(0.13);
-    plane.add(electron);
+    const balls = ELECTRON_TRAIL.map(([, size, glow]) => {       // the electron, then ghosts further and further behind
+      const ball = kit.edges(dot, kit.additive ? electronColor.clone().multiplyScalar(glow) : electronColor);
+      ball.scale.setScalar(size);
+      plane.add(ball);
+      return ball;
+    });
     orbits.add(plane);
-    return { electron, a, b, c, angle: rand() * Math.PI * 2, rate: ELECTRON_RATES[i] };
+    return { balls, angle: rand() * Math.PI * 2, rate: ELECTRON_RATE * (1 + 0.12 * (i - 1)) };
   });
   return {
     core: nucleus,
@@ -668,7 +679,10 @@ function atom(ctx) {
     update(dt) {
       for (const e of electrons) {
         e.angle += e.rate * dt;
-        e.electron.position.set(e.a * Math.cos(e.angle) - e.c, e.b * Math.sin(e.angle), 0);
+        e.balls.forEach((ball, k) => {
+          const t = e.angle - ELECTRON_TRAIL[k][0];
+          ball.position.set(ORBIT_A * Math.cos(t), ORBIT_B * Math.sin(t), 0);
+        });
       }
     },
   };
@@ -954,7 +968,7 @@ export const LOOKS = {
   atom: {
     id: 'atom',
     label: 'Atom',
-    tip: 'A nucleus of seven balls with three tilted elliptical orbits, an electron racing round each',
+    tip: 'A nucleus of protons and neutrons inside three crossing orbits, an electron trailing fading ghosts racing round each',
     usesDetail: true,
     noDice: true,
     build: atom,

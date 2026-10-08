@@ -187,9 +187,6 @@ body.panel-hidden #panel { transform: translateX(100%); }
 }
 .btn-primary { color: var(--amber); border-color: var(--amber); }
 .btn-primary:hover { background: rgba(255, 194, 77, 0.16); box-shadow: 0 0 6px rgba(255, 194, 77, 0.55); }
-/* the first button of a two-column grid takes the full row (the rest pair up beneath it) */
-.btn-grid.span-first > :first-child { grid-column: 1 / -1; }
-
 /* pixel icon in front of a button label (see icons.js); takes the button's text colour */
 .ic { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px; }
 .ic .icon { display: block; width: 100%; height: 100%; }
@@ -437,7 +434,7 @@ input[type='range']::-moz-range-thumb {
 .bar-val { width: 44px; text-align: right; color: var(--cyan); }
 
 /* selected-body editor */
-.editor.hidden { display: none; }
+.editor.idle .custom-body { display: none; }
 .editor-hint {
   font-size: 11px;
   color: var(--green-dim);

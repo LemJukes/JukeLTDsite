@@ -253,6 +253,13 @@ const app = {
   // together. Display-only: nothing here touches the simulation state.
   setTheme(id, { persist = true } = {}) {
     const theme = resolveTheme(id);
+    // The grid toggle is the user's, and carries across styles; only crossing between styles that
+    // disagree on whether the grid starts on (the notebook's paper is a grid already) resets it.
+    const gridOn = theme.scene.gridDefault !== false;
+    if (gridOn !== (resolveTheme(this.state.theme).scene.gridDefault !== false)) {
+      scene.options.showGrid = gridOn;
+      ui.syncToggles();
+    }
     this.state.theme = theme.id;
     document.documentElement.dataset.theme = theme.id;
     scene.setTheme(theme.scene);
@@ -414,6 +421,7 @@ document.documentElement.dataset.theme = startTheme.id;
 ui.setTheme(startTheme.id);
 ui.setCamera(app.state.camera);
 app.loadPreset('default', { autoplay: true });
+if (startTheme.scene.gridDefault === false) scene.options.showGrid = false;
 ui.syncToggles();
 ui.setCollisionMode(app.state.collisionMode);
 frame();

@@ -534,7 +534,9 @@ export function createUI(app) {
     el('span', { class: 'section-arrow', text: '▾' }),
     el('span', { text: 'Selected Body' }),
   ]);
-  const editorSection = el('div', { class: 'section editor hidden' }, [
+  // Always in the panel, so selecting a body is discoverable; with nothing selected only the hint and
+  // the Body A/B/C buttons show (the `idle` class hides the editing controls).
+  const editorSection = el('div', { class: 'section editor idle' }, [
     editorHead,
     el('div', { class: 'section-body' }, [
       el('div', { class: 'editor-hint', text: 'Click a body in the scene, or pick one:' }),
@@ -615,7 +617,7 @@ export function createUI(app) {
   // ---------- UI style ----------
   // Purely cosmetic: swaps the CSS skin and the 3D scene's look (app.setTheme).
   const themeBtns = {};
-  const themeRow = el('div', { class: 'btn-grid span-first' });
+  const themeRow = el('div', { class: 'btn-grid' });
   for (const id of themeOrder) {
     const b = button(THEMES[id].label, () => app.setTheme(id), '', THEMES[id].tip);
     themeBtns[id] = b;
@@ -771,12 +773,12 @@ export function createUI(app) {
       editSel.vx.set(cfg.vel.x); editSel.vy.set(cfg.vel.y); editSel.vz.set(cfg.vel.z);
       bodySelBtns.forEach((b, k) => b.classList.toggle('active', k === i));
       syncLook();
-      editorSection.classList.remove('hidden');
+      editorSection.classList.remove('idle');
     },
     // re-read the selected body's look (after an import, or applying one look to every body)
     syncLook() { if (editIndex >= 0) syncLook(); },
     hideBodyEditor() {
-      editorSection.classList.add('hidden');
+      editorSection.classList.add('idle');
       bodySelBtns.forEach((b) => b.classList.remove('active'));
     },
     // reflect external state into the slider widgets (e.g. presets change G/softening)

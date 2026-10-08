@@ -58,7 +58,8 @@ via an import map, plain ES modules, no install and no build step.
     and **red-pen annotations** written over the page: a circle round the selected body,
     "c.o.m.", a letter and leader line beside each body, and a note ("impact!", "merge") with a
     scribbled starburst where bodies collide. The panel is an index card taped into the margin,
-    with hand-drawn buttons and pencil-mark sliders.
+    with hand-drawn buttons and pencil-mark sliders. The 3D reference grid starts switched off here
+    (the paper is a grid already); the **Grid** toggle or `G` brings it back.
 
 ## Run it locally
 
@@ -122,7 +123,9 @@ this folder is already clean of that.
 
 ## Body looks
 
-Select a body (click it, or CUSTOM) and its **Look** box appears under its sliders. A look is only
+The **Selected Body** section is always in the panel: with nothing selected it shows the Body A / B / C
+buttons, and selecting a body (click it, or one of those buttons) opens its sliders and its **Look**
+box underneath. A look is only
 how a body is drawn: it never changes its mass, size, gravity, collisions or anything the physics
 exports. A body is always scaled by its physics radius, and clicks hit an invisible sphere of that
 size, so every look is as easy to pick as a plain ball. Looks survive preset loads and Reset (an
@@ -145,6 +148,9 @@ import replaces them), and **Apply to All** gives all three bodies the selected 
   if the comet is the heaviest, the body pulling on it hardest) and a curved dust tail that lags
   behind its motion. Tail length grows as it nears that body, within fixed limits.
 - **Ringed planet** — rings in the plane perpendicular to the body's own spin axis.
+- **Atom** — a nucleus of seven balls (protons red, neutrons in the body's colour; the Shape slider
+  picks what a ball is made of) inside three identical slim orbits turned 60° about the body's spin
+  axis, each with an electron racing round it and fading ghosts behind.
 - **Standing on a body** (CAMERA › Surface) works for every look; things that start at its centre
   (tails, beams, field lines) are not drawn around you.
 - Merging: the surviving body keeps its own look and the swallowed body's drawing is freed.
