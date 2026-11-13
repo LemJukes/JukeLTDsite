@@ -11,23 +11,33 @@ const planets = [
 ];
 
 const orrery = document.getElementById('orrery');
-const orrerySize = Math.min(window.innerWidth, window.innerHeight);
-const centerX = window.innerWidth / 2;
-const centerY = window.innerHeight / 2;
 const maxDistance = planets[planets.length - 1].distance;
 
-const scale = (orrerySize / 1) / (maxDistance + 0.5); // Scale to fit the entire system within the window
+// These follow the window size, so they are recomputed on resize.
+let orrerySize, centerX, centerY, scale;
+
+function layoutOrrery() {
+    orrerySize = Math.min(window.innerWidth, window.innerHeight);
+    centerX = window.innerWidth / 2;
+    centerY = window.innerHeight / 2;
+    scale = (orrerySize / 1) / (maxDistance + 0.5); // Scale to fit the entire system within the window
+
+    planets.forEach(planet => {
+        const radius = planet.radius * scale * 5; // Scaled for better visibility
+        const planetElement = document.getElementById(planet.name);
+        planetElement.style.width = `${radius}px`;
+        planetElement.style.height = `${radius}px`;
+    });
+}
 
 planets.forEach(planet => {
     const planetElement = document.createElement('div');
     planetElement.className = 'planet';
     planetElement.id = planet.name;
-    const radius = planet.radius * scale * 5; // Scaled for better visibility
-
-    planetElement.style.width = `${radius}px`;
-    planetElement.style.height = `${radius}px`;
     orrery.appendChild(planetElement);
 });
+
+layoutOrrery();
 
 function updatePositions(time) {
     planets.forEach(planet => {
@@ -51,9 +61,8 @@ function updatePositions(time) {
 
 requestAnimationFrame(updatePositions);
 
-window.addEventListener('resize', () => {
-    window.location.reload();
-});
+// The animation loop reads the updated values on its next frame.
+window.addEventListener('resize', layoutOrrery);
 
 // About Me page script
 document.addEventListener("DOMContentLoaded", function() {
