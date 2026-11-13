@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C.A.T.S. — Canine Automatic Translation System</title>
+    <meta name="description" content="Type something in human. C.A.T.S. says it in dog. An automated translation system for human to canine communication, by Juke LTD. in conjunction with Dogs for a Better Humanity.">
+    <link rel="canonical" href="https://jukeltd.com/CATS-Canine-Automatic-Translation-System/">
+    <meta name="theme-color" content="#131c4a">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Juke LTD.">
+    <meta property="og:title" content="C.A.T.S. — Canine Automatic Translation System">
+    <meta property="og:description" content="Type something in human. C.A.T.S. says it in dog.">
+    <meta property="og:url" content="https://jukeltd.com/CATS-Canine-Automatic-Translation-System/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="C.A.T.S. — Canine Automatic Translation System">
+    <meta name="twitter:description" content="Type something in human. C.A.T.S. says it in dog.">
+
+    <!-- Tennis ball favicon, inline so the app stays a self-contained folder. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23d9ea3c'/%3E%3Cpath d='M5 6c6 5 6 15 0 20M27 6c-6 5-6 15 0 20' fill='none' stroke='%23131c4a' stroke-width='2'/%3E%3C/svg%3E">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main class="kennel">
+        <header class="masthead">
+            <h1 class="title">C.A.T.S.</h1>
+            <p class="subtitle">Canine Automatic Translation System</p>
+        </header>
+
+        <form class="bench" id="translator" novalidate>
+            <section class="panel panel--human">
+                <label class="panel-name" for="inputText">Human</label>
+                <textarea id="inputText" maxlength="2000" spellcheck="true"
+                    placeholder="Who wants to go for a walk?"></textarea>
+
+                <fieldset class="dialects">
+                    <legend>Translate for a</legend>
+                    <div class="dialect-options" id="dialectOptions"></div>
+                </fieldset>
+            </section>
+
+            <button type="submit" class="ball" id="translateButton" title="Translate (Ctrl + Enter)">
+                <span>Translate</span>
+            </button>
+
+            <section class="panel panel--dog" aria-labelledby="dogName">
+                <h2 class="panel-name" id="dogName">Dog</h2>
+                <p class="output" id="output" aria-hidden="true"></p>
+                <p class="output-empty" id="outputEmpty">Nothing translated yet. Type something, then press Translate.</p>
+                <div class="output-tools">
+                    <button type="button" class="tool" id="retakeButton" disabled>Say it differently</button>
+                    <button type="button" class="tool" id="copyButton" disabled>Copy</button>
+                    <button type="button" class="tool" id="resetButton" disabled>Clear</button>
+                </div>
+            </section>
+        </form>
+
+        <!-- Screen readers get the finished translation once, not letter by letter. -->
+        <p class="visually-hidden" id="announcer" aria-live="polite"></p>
+
+        <footer class="smallprint">
+            <p>Developed by Juke LTD. in conjunction with Dogs for a Better Humanity. Accuracy not verified by any dog.</p>
+            <p>Colours chosen from the blue-and-yellow range dogs can see. Code generated with AI tooling; all design choices and responsibility lie with the developer. <a href="https://jukeltd.com/projects.html">Back to Juke LTD.</a></p>
+        </footer>
+    </main>
+
+    <script src="translator.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

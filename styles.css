@@ -47,11 +47,6 @@ body, html {
     margin-top: 10px;
 }
 
-/* Increased margin-top when navbar is not present */
-.header-alone {
-    margin-top: 50px;
-}
-
 .navbar,
 .writing-buttons {
     position: absolute;
@@ -249,90 +244,6 @@ body, html {
     .tray-caret {
         transition-duration: 0.01ms;
     }
-}
-
-.button-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 100px);
-    gap: 10px;
-    margin-bottom: 20px;
-    justify-content: center;
-}
-
-.button-grid span {
-    font-size: 50px;
-    cursor: pointer;
-    padding: 20px;
-    border: 1px solid white;
-    border-radius: 5px;
-    background: black;
-    transition: background 0.3s;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 60px;
-    width: 60px;
-    filter: grayscale(100%);
-}
-
-.button-grid span:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.result {
-    font-size: 24px;
-    margin-bottom: 20px;
-    min-height: 40px;
-    text-align: center;
-    width: 100%;
-    filter: grayscale(100%);
-
-}
-
-.controls {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-bottom: 20px;
-}
-
-.controls button {
-    padding: 10px 20px;
-    font-size: 16px;
-    cursor: pointer;
-    border: 1px solid white;
-    border-radius: 5px;
-    background: black;
-    color: white;
-    transition: background 0.3s;
-}
-
-.controls button:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.controls button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.tooltip {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid white;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 18px;
-    color: white;
-    display: none;
-    z-index: 2;
-}
-
-.swdr-instructions {
-    text-align: center;
 }
 
 /* Mobile styles */
