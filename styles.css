@@ -182,12 +182,9 @@ body, html {
     transform: none;
 }
 
-.nav-tray.open > .tray-items > .tray-item:nth-child(1) { transition-delay: 0s; }
-.nav-tray.open > .tray-items > .tray-item:nth-child(2) { transition-delay: 0.045s; }
-.nav-tray.open > .tray-items > .tray-item:nth-child(3) { transition-delay: 0.09s; }
-.nav-tray.open > .tray-items > .tray-item:nth-child(4) { transition-delay: 0.135s; }
-.nav-tray.open > .tray-items > .tray-item:nth-child(5) { transition-delay: 0.18s; }
-.nav-tray.open > .tray-items > .tray-item:nth-child(6) { transition-delay: 0.225s; }
+.nav-tray.open > .tray-items > .tray-item {
+    transition-delay: calc(var(--i, 0) * 0.045s);
+}
 
 /* Nested tray (K.A.C.S.) — flies out to the side so it clears its parent. */
 .nav-tray--sub > .tray-items--side {
@@ -235,6 +232,16 @@ body, html {
    screen fallback. */
 .itch-link {
     display: none;
+}
+
+/* The Scratch embed is authored at 485x402; on a narrow screen it shrinks to
+   fit and keeps that shape instead of overflowing. */
+.scratch-embed {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 485 / 402;
+    margin: 0 auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

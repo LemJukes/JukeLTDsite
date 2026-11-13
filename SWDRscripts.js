@@ -83,9 +83,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.removeChild(textArea);
     }
 
-    window.clearResult = function() {
+    document.getElementById('clearButton').addEventListener('click', function() {
         resultText.textContent = '';
-    };
+    });
 
     function showTooltip(message) {
         tooltip.textContent = message;

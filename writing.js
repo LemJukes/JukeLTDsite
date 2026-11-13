@@ -18,7 +18,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadText(filename) {
         try {
             const response = await fetch(`Writing Files/${filename}`);
-            const text = await response.text();
+            const raw = await response.text();
+            const text = raw
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
             
             textContent.innerHTML = `
                 <button class="close-button">×</button>
