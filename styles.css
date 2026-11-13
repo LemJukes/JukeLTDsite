@@ -237,6 +237,16 @@ body, html {
     display: none;
 }
 
+/* The Scratch embed is authored at 485x402; on a narrow screen it shrinks to
+   fit and keeps that shape instead of overflowing. */
+.scratch-embed {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 485 / 402;
+    margin: 0 auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .tray-item,
     .tray-caret {
