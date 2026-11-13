@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Star Wars Dice Roll Generator</title>
+    <title>Dice Result Generator — Juke LTD. (Rob Garner)</title>
+    <meta name="description" content="A dice result generator for Star Wars: Edge of the Empire — click the symbols to build a roll result, then copy it to the clipboard.">
+    <link rel="canonical" href="https://jukeltd.com/SWDRindex.html">
     <link rel="stylesheet" href="styles.css"> <!-- Use the main website's stylesheet -->
+    <link rel="icon" href="jukeLTDFavicon.png" type="image/png">
 </head>
 <body class="scrim">
     <div id="orrery"></div>
@@ -19,7 +22,7 @@
         </div>
         <div class="controls">
             <button id="copyButton">Copy to Clipboard</button>
-            <button onclick="clearResult()">Clear</button>
+            <button id="clearButton">Clear</button>
         </div>
         <div class="tooltip" id="tooltip"></div>
     </div>
